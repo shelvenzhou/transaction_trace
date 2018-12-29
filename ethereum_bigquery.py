@@ -1,7 +1,9 @@
 from google.cloud import bigquery
 import logging
+from .datetime_utils import *
 
 l = logging.getLogger("bigquery-ethereum-crawler.ethereum_bigquery")
+
 
 class EthereumBigQuery(object):
     def __init__(self):

@@ -1,21 +1,11 @@
 import sqlite3
-from datetime import datetime
 import decimal
 import logging
+from .datetime_utils import *
 
 l = logging.getLogger("bigquery-ethereum-crawler.ethereum_database")
 
 DB_FILEPATH = "bigquery_ethereum.sqlite3"
-
-DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-
-def time_to_str(t):
-    return t.strftime(DATETIME_FORMAT)
-
-
-def str_to_time(s):
-    return datetime.strptime(s, DATETIME_FORMAT)
 
 
 def adapt_decimal(d):
