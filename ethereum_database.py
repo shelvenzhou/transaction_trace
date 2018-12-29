@@ -1,4 +1,3 @@
-from google.cloud import bigquery
 import sqlite3
 from datetime import datetime
 import decimal
@@ -35,22 +34,13 @@ class EthereumDatabase(object):
 
     def __init__(self, db_filepath=DB_FILEPATH):
         self.db_filepath = db_filepath
-        self.conn = sqlite3.connect(self.db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
+        self.conn = sqlite3.connect(
+            self.db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
         self.conn.row_factory = sqlite3.Row
         self.cur = self.conn.cursor()
 
-        self.client = bigquery.Client()
-
     def __del__(self):
         self.conn.close()
-
-    def get_ethereum_data(self, from_time, to_time):
-        query_str = (
-            f'SELECT * FROM `bigquery-public-data.ethereum_blockchain.traces` '
-            f'WHERE block_timestamp >= "{time_to_str(from_time)}" AND block_timestamp < "{time_to_str(to_time)}" AND from_address IS NOT NULL'
-        )
-
-        return self.client.query(query_str).result()
 
     def database_create(self):
         self.cur.execute("""
