@@ -1,6 +1,6 @@
 from google.cloud import bigquery
+from .datetime_utils import time_to_str
 import logging
-from .datetime_utils import *
 
 l = logging.getLogger("bigquery-ethereum-crawler.ethereum_bigquery")
 

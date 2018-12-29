@@ -1,7 +1,6 @@
 import sqlite3
 import decimal
 import logging
-from .datetime_utils import *
 
 l = logging.getLogger("bigquery-ethereum-crawler.ethereum_database")
 
@@ -35,6 +34,7 @@ class EthereumDatabase(object):
     def database_create(self):
         self.cur.execute("""
             CREATE TABLE traces(
+                id INT PRIMARY KEY NOT NULL,
                 transaction_hash TEXT,
                 transaction_index INT,
                 from_address TEXT,
@@ -55,7 +55,24 @@ class EthereumDatabase(object):
                 block_number INT NOT NULL,
                 block_hash STRING NOT NULL
             );
-            """)
+        """)
+
+        self.cur.execute("""
+            CREATE TABLE subtraces(
+                transaction_hash TEXT,
+                trace_address TEXT,
+                parent_trace_id INT NOT NULL,
+                PRIMARY KEY (transaction_hash, trace_address)
+            );
+        """)
+
+        self.cur.execute("""
+            CREATE TABLE crawl_records(
+                from_time TIMESTAMP NOT NULL,
+                to_time TIMESTAMP NOT NULL,
+                trace_count INT NOT NULL
+            );
+        """)
 
         self.database_commit()
 
@@ -72,8 +89,8 @@ class EthereumDatabase(object):
 
     def database_insert(self, rows):
         self.cur.executemany("""
-            INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO traces(id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
+            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, rows)
 
     def database_commit(self):
