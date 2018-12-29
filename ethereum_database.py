@@ -59,6 +59,17 @@ class EthereumDatabase(object):
 
         self.database_commit()
 
+    def database_index_create(self):
+        """
+        This should ONLY be called after all data is crawled.
+        """
+        self.cur.execute(
+            "CREATE INDEX transaction_hash_index ON traces(transaction_hash);")
+        self.cur.execute(
+            "CREATE INDEX block_timestamp_index ON traces(block_timestamp);")
+
+        self.database_commit()
+
     def database_insert(self, rows):
         self.cur.executemany("""
             INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
