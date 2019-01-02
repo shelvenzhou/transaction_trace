@@ -1,10 +1,11 @@
 import sqlite3
 import decimal
 import logging
+import sys
 
 l = logging.getLogger("bigquery-ethereum-crawler.local.ethereum_database")
 
-DB_FILEPATH = "bigquery_ethereum.sqlite3"
+DB_FILEPATH = "bigquery_ethereum-t.sqlite3"
 
 
 def adapt_decimal(d):
@@ -85,10 +86,27 @@ class EthereumDatabase(object):
         self.database_commit()
 
     def database_insert(self, rows):
-        self.cur.executemany("""
-            INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """, rows)
+        # self.cur.executemany("""
+        #     INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
+        #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        # """, rows)
+
+        trace_count = 0
+        for row in rows:
+            # import IPython;IPython.embed()
+            try:
+                self.cur.execute("""
+                    INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """, row)
+            except sqlite3.Error as e:
+                print(e)
+                import IPython
+                IPython.embed()
+            trace_count += 1
+            sys.stdout.write(str(trace_count) + '\r')
+            sys.stdout.flush()
+        return trace_count
 
     def database_commit(self):
         self.conn.commit()
