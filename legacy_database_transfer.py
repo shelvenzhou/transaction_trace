@@ -15,7 +15,10 @@ def text2int(s):
     return int(s)
 
 def text2decimal(s):
-    decimal.Decimal(s)
+    if s == "None":
+        return None
+
+    return decimal.Decimal(s)
 
 transfer_funcs = list((
     transfer_text, #transaction_hash TEXT,
@@ -58,7 +61,7 @@ def main(db_filepath):
     insert_count = 0
     cur.execute("SELECT * FROM traces;")
     while True:
-        rows = cur.fetchmany(10000)
+        rows = cur.fetchmany(100000)
         if len(rows) == 0:
             break
 
@@ -66,7 +69,7 @@ def main(db_filepath):
         local.database_commit()
 
         insert_count += len(rows)
-        print(insert_count, " rows inserted")
+        print("%d rows inserted" % insert_count)
 
 
 if __name__ == "__main__":
