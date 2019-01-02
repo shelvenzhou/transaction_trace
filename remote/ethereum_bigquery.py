@@ -1,11 +1,12 @@
 from google.cloud import bigquery
-from datetime_utils import time_to_str
+from ..datetime_utils import time_to_str
+from .remote_datasource import RemoteDateSource
 import logging
 
-l = logging.getLogger("bigquery-ethereum-crawler.ethereum_bigquery")
+l = logging.getLogger("bigquery-ethereum-crawler.remote.ethereum_bigquery")
 
 
-class EthereumBigQuery(object):
+class EthereumBigQuery(RemoteDateSource):
     def __init__(self):
         self.client = bigquery.Client()
 

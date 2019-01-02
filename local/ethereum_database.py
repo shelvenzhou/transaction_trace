@@ -2,7 +2,7 @@ import sqlite3
 import decimal
 import logging
 
-l = logging.getLogger("bigquery-ethereum-crawler.ethereum_database")
+l = logging.getLogger("bigquery-ethereum-crawler.local.ethereum_database")
 
 DB_FILEPATH = "bigquery_ethereum.sqlite3"
 
@@ -34,7 +34,7 @@ class EthereumDatabase(object):
     def database_create(self):
         self.cur.execute("""
             CREATE TABLE traces(
-                id INT PRIMARY KEY NOT NULL,
+                id INT PRIMARY KEY,
                 transaction_hash TEXT,
                 transaction_index INT,
                 from_address TEXT,
