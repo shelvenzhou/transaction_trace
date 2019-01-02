@@ -34,7 +34,6 @@ class EthereumDatabase(object):
     def database_create(self):
         self.cur.execute("""
             CREATE TABLE traces(
-                id INT PRIMARY KEY,
                 transaction_hash TEXT,
                 transaction_index INT,
                 from_address TEXT,
@@ -87,8 +86,8 @@ class EthereumDatabase(object):
 
     def database_insert(self, rows):
         self.cur.executemany("""
-            INSERT INTO traces(id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
-            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, rows)
 
     def database_commit(self):
