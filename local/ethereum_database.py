@@ -74,8 +74,6 @@ class EthereumDatabase(object):
             );
         """)
 
-        self.database_commit()
-
     def database_index_create(self):
         """
         This should ONLY be called after all data is crawled.
@@ -91,10 +89,16 @@ class EthereumDatabase(object):
         self.cur.executemany("""
             INSERT INTO traces(id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
             VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """, rows)
+        """, rows)
 
     def database_commit(self):
         self.conn.commit()
+
+    def update_crawl_records(self, from_time, to_time, trace_count):
+        self.cur.execute("""
+            INSERT INTO crawl_records(from_time, to_time, trace_count)
+            VALUES (?, ?, ?)
+        """, (from_time, to_time, trace_count))
 
     def read_from_database(self):
         '''
