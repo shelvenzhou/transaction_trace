@@ -9,14 +9,14 @@ logger.setLevel(logging.INFO)
 
 def main():
     remote = EthereumBigQuery()
-    local = EthereumDatabase()
+    local = EthereumDatabase("/home/jay/w/db/bigquery_ethereum.sqlite3")
 
     # database table init
     # local.database_create()
 
     # data insertion
-    from_time = datetime(2018, 10, 3, 22, 0, 0)
-    to_time = datetime(2018, 10, 3, 23, 0, 0)
+    from_time = datetime(2018, 9, 24, 18, 0, 0)
+    to_time = datetime(2018, 9, 24, 19, 0, 0)
 
     while True:
         print(f"query from {from_time} to {to_time}...")

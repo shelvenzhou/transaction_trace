@@ -5,7 +5,7 @@ import sys
 
 l = logging.getLogger("bigquery-ethereum-crawler.local.ethereum_database")
 
-DB_FILEPATH = "bigquery_ethereum-t.sqlite3"
+DB_FILEPATH = "bigquery_ethereum.sqlite3"
 
 
 def adapt_decimal(d):
@@ -60,9 +60,8 @@ class EthereumDatabase(object):
         self.cur.execute("""
             CREATE TABLE subtraces(
                 transaction_hash TEXT,
-                trace_address TEXT,
-                parent_trace_id INT NOT NULL,
-                PRIMARY KEY (transaction_hash, trace_address)
+                id INT PRIMARY KEY,
+                parent_trace_id INT,
             );
         """)
 
@@ -101,8 +100,6 @@ class EthereumDatabase(object):
                 """, row)
             except sqlite3.Error as e:
                 print(e)
-                import IPython
-                IPython.embed()
             trace_count += 1
             sys.stdout.write(str(trace_count) + '\r')
             sys.stdout.flush()
