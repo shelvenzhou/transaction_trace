@@ -8,11 +8,4 @@ def time_to_str(t):
 
 
 def str_to_time(s):
-    try:
-        time = datetime.strptime(s, DATETIME_FORMAT)
-    except ValueError:
-        try:
-            time = datetime.strptime(s, "%a %b %d %H:%M:%S %Y")
-        except ValueError:
-            print(ValueError)
-    return time
+    return datetime.strptime(s, DATETIME_FORMAT)

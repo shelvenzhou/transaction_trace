@@ -72,7 +72,7 @@ class SubTraceBuilder(object):
                 if parent_level != None:
                     try:
                         parent_id = traceoftxs[tx]['trace_map'][parent_level][parent_seq]
-                        st.updateParentID(parent_id)
+                        st.update_parent_id(parent_id)
                     except:
                         print(f"parent not found for {st.id}")
                 self.write_db(st)
