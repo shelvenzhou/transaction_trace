@@ -1,24 +1,34 @@
-from datetime import datetime
-
+from datetime import datetime,timedelta
+import logging
 from remote.ethereum_bigquery import EthereumBigQuery
 from local.ethereum_database import EthereumDatabase
 
+l = logging.getLogger("bigquery-ethereum-crawler")
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def main():
     remote = EthereumBigQuery()
-    local = EthereumDatabase()
+    local = EthereumDatabase("/home/jay/w/db/bigquery_ethereum.sqlite3")
 
     # database table init
     # local.database_create()
 
     # data insertion
-    from_time = datetime(2018, 12, 27, 1, 1, 1) # 2018-12-27 1:1:1
-    to_time = datetime(2018, 12, 27, 1, 2, 1) # 2018-12-27 1:2:1
+    from_time = datetime(2018, 9, 24, 18, 0, 0)
+    to_time = datetime(2018, 9, 24, 19, 0, 0)
 
-    rows = remote.get_ethereum_data(from_time, to_time)
-    local.database_insert(rows)
-    local.update_crawl_records(from_time, to_time, -1)
-    local.database_commit()
+    while True:
+        print(f"query from {from_time} to {to_time}...")
+        rows = remote.get_ethereum_data(from_time, to_time)
+        
+        trace_count = local.database_insert(rows)
+        print(f"{trace_count} inserted")
+        local.update_crawl_records(from_time, to_time, trace_count)
+        local.database_commit()
+
+        to_time = from_time
+        from_time = from_time - timedelta(hours=1)
 
 if __name__ == "__main__":
     main()

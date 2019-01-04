@@ -1,7 +1,18 @@
 from google.cloud import bigquery
-from ..datetime_utils import time_to_str
 from .remote_datasource import RemoteDateSource
 import logging
+from datetime import datetime
+
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def time_to_str(t):
+    return t.strftime(DATETIME_FORMAT)
+
+
+def str_to_time(s):
+    return datetime.strptime(s, DATETIME_FORMAT)
+
 
 l = logging.getLogger("bigquery-ethereum-crawler.remote.ethereum_bigquery")
 
