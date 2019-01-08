@@ -106,10 +106,10 @@ class GraphAnalyzer(object):
         cycles = list(nx.simple_cycles(subtrace_graph))
         reentrancy = self.check_reentrancy(subtrace_graph, cycles)
         callinjection = self.check_callinjection(subtrace_graph, cycles)
-        if reentrancy > -1 or callinjection:
-            fun = True
+        fun = reentrancy > -1 or callinjection
+        if reentrancy > 0 or callinjection:
             print(subtrace_graph.graph['transaction_hash'])
-            if reentrancy:
+            if reentrancy > 0:
                 print("Reentrancy Attack Found!")
             if callinjection:
                 print("Call Injection Attack Might Found!")
@@ -121,7 +121,11 @@ class GraphAnalyzer(object):
         callinjection = False
         for cycle in cycles:
             if len(cycle) == 1:
-                callinjection = True
+                edges = self.get_edges_from_cycle(cycle)
+                data = graph.get_edge_data(*edges[0])
+                for gas_used in data['gas_used']:
+                    if gas_used > 0:
+                        callinjection = True
         return callinjection
 
     def check_reentrancy(self, graph, cycles):
