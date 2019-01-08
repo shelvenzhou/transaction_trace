@@ -9,7 +9,7 @@ logger.setLevel(logging.INFO)
 
 def main():
     remote = EthereumBigQuery()
-    local = EthereumDatabase("/home/jay/w/db/bigquery_ethereum.sqlite3")
+    local = EthereumDatabase("/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3")
 
     # database table init
     # local.database_create()
