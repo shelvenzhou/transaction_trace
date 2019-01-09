@@ -17,7 +17,7 @@ def main():
 
     # data insertion
     try:
-        with open("crawl-time", "r") as f:
+        with open("logs/crawl-time", "r") as f:
             from_time = str_to_time(f.readline())
     except:
         from_time = datetime(2018, 9, 24, 18, 0, 0)
@@ -34,7 +34,7 @@ def main():
 
         to_time = from_time
         from_time = from_time - timedelta(hours=1)
-        with open("crawl-time", "w+") as f:
+        with open("logs/crawl-time", "w+") as f:
             f.write(time_to_str(from_time))
 
 if __name__ == "__main__":

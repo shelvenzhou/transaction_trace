@@ -38,32 +38,39 @@ class SubTraceBuilder(object):
     def build_subtrace(self, from_time, to_time):
         traceoftxs = {}
         re = self.query_db(from_time, to_time)
-        for row in re:
-            if row['trace_address'] != None:
-                trace_addr = row['trace_address'].split(',')
-                if len(trace_addr) == 1:
-                    parent_level = 0
-                    parent_seq = 0
+        try:
+            for row in re:
+                if row['trace_address'] != None:
+                    trace_addr = row['trace_address'].split(',')
+                    if len(trace_addr) == 1:
+                        parent_level = 0
+                        parent_seq = 0
+                    else:
+                        parent_level = len(trace_addr)-1
+                        parent_seq = int(trace_addr[-2])
+                    st = SubTrace(txhash=row['transaction_hash'], id=row['rowid'], level=len(trace_addr), seq=int(trace_addr[-1]), parent_level=parent_level, parent_seq=parent_seq)
                 else:
-                    parent_level = len(trace_addr)-1
-                    parent_seq = int(trace_addr[-2])
-                st = SubTrace(txhash=row['transaction_hash'], id=row['rowid'], level=len(trace_addr), seq=int(trace_addr[-1]), parent_level=parent_level, parent_seq=parent_seq)
-            else:
-                st = SubTrace(txhash=row['transaction_hash'], id=row['rowid'], level=0, seq=0)
+                    st = SubTrace(txhash=row['transaction_hash'], id=row['rowid'], level=0, seq=0)
 
-            txhash = row['transaction_hash']
-            if txhash in traceoftxs.keys():
-                traceoftxs[txhash]['traces'].append(st)
-                if st.level in traceoftxs[txhash]['trace_map'].keys():
-                    traceoftxs[txhash]['trace_map'][st.level][st.seq] = row['rowid']
+                txhash = row['transaction_hash']
+                if txhash in traceoftxs.keys():
+                    traceoftxs[txhash]['traces'].append(st)
+                    if st.level in traceoftxs[txhash]['trace_map'].keys():
+                        traceoftxs[txhash]['trace_map'][st.level][st.seq] = row['rowid']
+                    else:
+                        traceoftxs[txhash]['trace_map'][st.level] = {st.seq:row['rowid']}
                 else:
-                    traceoftxs[txhash]['trace_map'][st.level] = {st.seq:row['rowid']}
-            else:
-                traces = []
-                traces.append(st)
-                trace_map = {}
-                trace_map[st.level] = {st.seq:row['rowid']}
-                traceoftxs[txhash] = {'traces':traces, 'trace_map':trace_map}
+                    traces = []
+                    traces.append(st)
+                    trace_map = {}
+                    trace_map[st.level] = {st.seq:row['rowid']}
+                    traceoftxs[txhash] = {'traces':traces, 'trace_map':trace_map}
+        except sqlite3.DatabaseError as e:
+            error = time_to_str(from_time) + " " + time_to_str(to_time) + " " + str(e)
+            print(error)
+            with open("logs/database_error", 'a+') as f:
+                f.write(error)
+            return
 
         for tx in traceoftxs.keys():
             for st in traceoftxs[tx]['traces']:
@@ -81,11 +88,15 @@ class SubTraceBuilder(object):
         traceoftxs = {}
 
 def main():
-    from_time = datetime(2018, 10, 5, 6, 0, 0)
-    to_time = datetime(2018, 10, 8, 7, 0, 0)
-
     builder = SubTraceBuilder(DB_FILEPATH)
-    builder.build_subtrace(from_time, to_time)
+    from_time = datetime(2018, 8, 1, 9, 0, 0)
+    to_time = from_time + timedelta(hours=2)
+
+    while from_time < datetime(2018, 12, 25, 0, 0, 0):
+        print("building subtraces from", time_to_str(from_time), "to", time_to_str(to_time))
+        builder.build_subtrace(from_time, to_time)
+        from_time = to_time
+        to_time = from_time + timedelta(hours=2)
 
 
 

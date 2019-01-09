@@ -1,5 +1,6 @@
 import networkx as nx
 from local.ethereum_database import EthereumDatabase
+from datetime_utils import time_to_str
 from datetime import datetime,timedelta
 import sys
 
@@ -29,9 +30,6 @@ class DiGraphBuilder(object):
         trace_dg = nx.DiGraph()
         traces = self.query_traces_bytime(from_time, to_time)
         for trace in traces:
-            # trace_id = row['id']
-            # parent_trace_id = row['parent_trace_id']
-    
             tx_hash = trace['transaction_hash']
             from_address = trace['from_address']
             to_address = trace['to_address']
@@ -55,7 +53,7 @@ class DiGraphBuilder(object):
 
         subtrace_graghs = []
         txs = self.query_txs_bytime(from_time, to_time).fetchall()
-        print(f'building graphs for {len(txs)} transactions...')
+        print(f"{len(txs)} transactions")
         tx_count = 0
         for tx in txs:
             trace_gragh = self.build_digraph_on_subtraces_bytx(tx['transaction_hash'])
@@ -97,35 +95,55 @@ class DiGraphBuilder(object):
         return trace_dg
 
 class GraphAnalyzer(object):
-    def __init__(self):
-        pass
+    def __init__(self, db):
+        self.local = db
+
+    def query_input_byid(self, traceid):
+        return self.local.cur.execute("select input from traces where rowid = :trace_id", {'trace_id':traceid})
 
     def analyze_subtraces(self, subtrace_graph):
         fun = False
-
         cycles = list(nx.simple_cycles(subtrace_graph))
         reentrancy = self.check_reentrancy(subtrace_graph, cycles)
         callinjection = self.check_callinjection(subtrace_graph, cycles)
         fun = reentrancy > -1 or callinjection
         if reentrancy > 0 or callinjection:
-            print(subtrace_graph.graph['transaction_hash'])
+            f = open("logs/subtrace_analysis", "a+")
+            m = subtrace_graph.graph['transaction_hash']
+            print(m)
+            f.write(m + "\n")
             if reentrancy > 0:
-                print("Reentrancy Attack Found!")
+                m = "Reentrancy Attack Found!"
+                print(m)
+                f.write(m + "\n")
             if callinjection:
-                print("Call Injection Attack Might Found!")
-            print("########################################")
+                m = "Call Injection Attack Might Found!"
+                print(m)
+                f.write(m + "\n")
+            m = "########################################"
+            print(m)
+            f.write(m + "\n")
+            f.close()
 
         return fun
 
     def check_callinjection(self, graph, cycles):
         callinjection = False
         for cycle in cycles:
+            if callinjection:
+                break
             if len(cycle) == 1:
                 edges = self.get_edges_from_cycle(cycle)
                 data = graph.get_edge_data(*edges[0])
-                for gas_used in data['gas_used']:
-                    if gas_used > 0:
-                        callinjection = True
+                for index in range(0, len(data['id'])):
+                    trace_input = self.query_input_byid(data['id'][index]).fetchone()['input']
+                    parent_trace_input = self.query_input_byid(data['parent_trace_id'][index]).fetchone()['input']
+                    if len(trace_input) > 10 and len(parent_trace_input) > 10:
+                        method_hash = trace_input[:10]
+                        if method_hash in parent_trace_input:
+                            callinjection = True
+                            break
+
         return callinjection
 
     def check_reentrancy(self, graph, cycles):
@@ -137,16 +155,16 @@ class GraphAnalyzer(object):
         for cycle in cycles:
             count = self.check_reentrancy_bycycle(graph, cycle)
             if count > 0:
-                print("--------------------")
-                print(graph.graph['transaction_hash'])
-                print(f"trace cycle found, number of turns: ", count)
                 graph.graph['cycles'].append(cycle)
                 reentrancy = 0
                 if count > 5:
                     reentrancy = 1
-                for node in cycle:
-                    print(node, "->")
-                print("--------------------")
+                    print("--------------------")
+                    print(graph.graph['transaction_hash'])
+                    print(f"trace cycle found, number of turns: ", count)
+                    for node in cycle:
+                        print(node, "->")
+                    print("--------------------")
         
         return reentrancy
 
@@ -180,30 +198,29 @@ class GraphAnalyzer(object):
 
 
 def main():
-    from_time = datetime(2018, 10, 5, 6, 0, 0)
-    to_time = datetime(2018, 10, 8, 7, 0, 0)
-
     builder = DiGraphBuilder(DB_FILEPATH)
-    analyzer = GraphAnalyzer()
-    # graphs = builder.build_digraph_on_subtraces_bytime(from_time, to_time)
-    graphs = []
-    txs = builder.query_txs_bytime(from_time, to_time).fetchall()
-    print(f'building graphs and analyzing for {len(txs)} transactions...')
-    count = 0
-    for tx in txs:
-        sys.stdout.write(str(count) + '\r')
-        sys.stdout.flush()
+    analyzer = GraphAnalyzer(builder.local)
 
-        count += 1
-        trace_gragh = builder.build_digraph_on_subtraces_bytx(tx['transaction_hash'])
-        if trace_gragh == None:
-            continue
-        if analyzer.analyze_subtraces(trace_gragh):
-            graphs.append(trace_gragh)
-            print(f"{len(graphs)} fun, {len(txs)-count} txs left... ")
+    from_time = datetime(2018, 8, 1, 9, 0, 0)
+    to_time = datetime(2018, 12, 25, 0, 0, 0)
+    # to_time = from_time + timedelta(hours=1)
+    while from_time < datetime(2018, 12, 25, 0, 0, 0):
+        print("building subtrace graphs from", time_to_str(from_time), "to", time_to_str(to_time))
+        graphs = builder.build_digraph_on_subtraces_bytime(from_time, to_time)
+        print(f"analyzing {len(graphs)} graphs...")
+        fun = False
+        count = 0
+        for trace_graph in graphs:
+            fun = fun or analyzer.analyze_subtraces(trace_graph)
+            count += 1
+            sys.stdout.write(str(count) + '\r')
+            sys.stdout.flush()
+        if not fun:
+            print("no attack found")
 
-    # trace_gragh = builder.build_digraph_on_subtraces_bytx("0x21e9d20b57f6ae60dac23466c8395d47f42dc24628e5a31f224567a2b4effa88")
-    # ret = analyzer.analyze_subtraces(trace_gragh)
+        from_time = to_time
+        to_time = from_time + timedelta(hours=1)
+
     import IPython;IPython.embed()
 
 
