@@ -108,6 +108,8 @@ class EthereumDatabase(object):
             "CREATE INDEX transaction_hash_index ON traces(transaction_hash);")
         self.cur.execute(
             "CREATE INDEX block_timestamp_index ON traces(block_timestamp);")
+        self.cur.execute(
+            "CREATE INDEX subtraces_transaction_hash_index ON subtraces(transaction_hash);")
 
         self.database_commit()
 

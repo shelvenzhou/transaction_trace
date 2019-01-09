@@ -27,7 +27,7 @@ class SubTraceBuilder(object):
         self.local = EthereumDatabase(db_filepath)
 
     def query_db(self, from_time, to_time):
-        return self.local.cur.execute("select rowid,* from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+        return self.local.cur.execute("select rowid,* from traces indexed by transaction_hash_index where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def write_db(self, st):
         try:
