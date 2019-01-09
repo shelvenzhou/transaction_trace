@@ -4,7 +4,7 @@ from datetime_utils import time_to_str
 from datetime import datetime,timedelta
 import decimal
 
-DB_FILEPATH = "/home/jay/w/db/bigquery_ethereum-t.sqlite3"
+DB_FILEPATH = "/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3"
 
 
 class SubTrace(object):
@@ -23,8 +23,8 @@ class SubTrace(object):
 
 class SubTraceBuilder(object):
 
-    def __init__(self, DB_FILEPATH):
-        self.local = EthereumDatabase(DB_FILEPATH)
+    def __init__(self, db_filepath=DB_FILEPATH):
+        self.local = EthereumDatabase(db_filepath)
 
     def query_db(self, from_time, to_time):
         return self.local.cur.execute("select rowid,* from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
@@ -82,7 +82,7 @@ class SubTraceBuilder(object):
 
 def main():
     from_time = datetime(2018, 10, 5, 6, 0, 0)
-    to_time = datetime(2018, 10, 5, 7, 0, 0)
+    to_time = datetime(2018, 10, 8, 7, 0, 0)
 
     builder = SubTraceBuilder(DB_FILEPATH)
     builder.build_subtrace(from_time, to_time)
