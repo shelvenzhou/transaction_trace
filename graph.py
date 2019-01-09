@@ -20,7 +20,7 @@ class DiGraphBuilder(object):
         return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input from traces indexed by transaction_hash_index where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_bytx(self, transaction_hash):
-        return self.local.cur.execute("select * from subtraces indexed by transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+        return self.local.cur.execute("select * from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
 
     def query_txs_bytime(self, from_time, to_time):
         return self.local.cur.execute("select distinct transaction_hash from traces indexed by transaction_hash_index where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
