@@ -20,7 +20,7 @@ class DiGraphBuilder(object):
         return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input from traces indexed by transaction_hash_index where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_bytx(self, transaction_hash):
-        return self.local.cur.execute("select * from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+        return self.local.cur.execute("select * from subtraces where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
 
     def query_txs_bytime(self, from_time, to_time):
         return self.local.cur.execute("select distinct transaction_hash from traces indexed by transaction_hash_index where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
@@ -51,20 +51,20 @@ class DiGraphBuilder(object):
 
     def build_digraph_on_subtraces_bytime(self, from_time, to_time):
 
-        subtrace_graghs = []
+        subtrace_graphs = []
         txs = self.query_txs_bytime(from_time, to_time).fetchall()
         print(f"{len(txs)} transactions")
         tx_count = 0
         for tx in txs:
-            trace_gragh = self.build_digraph_on_subtraces_bytx(tx['transaction_hash'])
-            if trace_gragh == None:
+            trace_graph = self.build_digraph_on_subtraces_bytx(tx['transaction_hash'])
+            if trace_graph == None:
                 continue
-            subtrace_graghs.append(trace_gragh)
+            subtrace_graphs.append(trace_graph)
             tx_count += 1
             sys.stdout.write(str(tx_count) + '\r')
             sys.stdout.flush()
 
-        return subtrace_graghs
+        return subtrace_graphs
 
     def build_digraph_on_subtraces_bytx(self, transaction_hash):
         subtraces = self.query_subtraces_bytx(transaction_hash).fetchall()
@@ -117,7 +117,7 @@ class GraphAnalyzer(object):
                 print(m)
                 f.write(m + "\n")
             if callinjection:
-                m = "Call Injection Attack Might Found!"
+                m = "Call Injection Attack Mipht Found!"
                 print(m)
                 f.write(m + "\n")
             m = "########################################"
@@ -136,12 +136,20 @@ class GraphAnalyzer(object):
                 edges = self.get_edges_from_cycle(cycle)
                 data = graph.get_edge_data(*edges[0])
                 for index in range(0, len(data['id'])):
-                    trace_input = self.query_input_byid(data['id'][index]).fetchone()['input']
-                    parent_trace_input = self.query_input_byid(data['parent_trace_id'][index]).fetchone()['input']
+                    id = data['id'][index]
+                    parent_trace_id = data['parent_trace_id'][index]
+                    if parent_trace_id == None:
+                        continue
+                    trace_input = self.query_input_byid(id).fetchone()['input']          
+                    parent_trace_input = self.query_input_byid(parent_trace_id).fetchone()['input']
                     if len(trace_input) > 10 and len(parent_trace_input) > 10:
-                        method_hash = trace_input[:10]
+                        method_hash = trace_input[2:10]
                         if method_hash in parent_trace_input:
                             callinjection = True
+                            print("--------------------")
+                            print(cycle[0])
+                            print("trace id: ", id, "parent trace id: ", parent_trace_id)
+                            print("--------------------")
                             break
 
         return callinjection
@@ -160,7 +168,7 @@ class GraphAnalyzer(object):
                 if count > 5:
                     reentrancy = 1
                     print("--------------------")
-                    print(graph.graph['transaction_hash'])
+                    # print(graph.graph['transaction_hash'])
                     print(f"trace cycle found, number of turns: ", count)
                     for node in cycle:
                         print(node, "->")
