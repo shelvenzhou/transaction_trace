@@ -98,6 +98,10 @@ class GraphAnalyzer(object):
     def __init__(self, db):
         self.local = db
 
+    def print_and_write(self, file, msg):
+        print(msg)
+        file.write(msg + "\n")
+
     def query_input_byid(self, traceid):
         return self.local.cur.execute("select input from traces where rowid = :trace_id", {'trace_id':traceid})
 
@@ -114,15 +118,12 @@ class GraphAnalyzer(object):
             f.write(m + "\n")
             if reentrancy > 0:
                 m = "Reentrancy Attack Found!"
-                print(m)
-                f.write(m + "\n")
+                self.print_and_write(f, m)
             if callinjection:
                 m = "Call Injection Attack Mipht Found!"
-                print(m)
-                f.write(m + "\n")
+                self.print_and_write(f, m)
             m = "########################################"
-            print(m)
-            f.write(m + "\n")
+            self.print_and_write(f, m)
             f.close()
 
         return fun
@@ -146,10 +147,16 @@ class GraphAnalyzer(object):
                         method_hash = trace_input[2:10]
                         if method_hash in parent_trace_input:
                             callinjection = True
-                            print("--------------------")
-                            print(cycle[0])
-                            print("trace id: ", id, "parent trace id: ", parent_trace_id)
-                            print("--------------------")
+                            f = open("logs/subtrace_analysis", "a+")
+                            m = "--------------------"
+                            self.print_and_write(f, m)
+                            m = cycle[0]
+                            self.print_and_write(f, m)
+                            m = "trace id: " + str(id) + " parent trace id: " + str(parent_trace_id)
+                            self.print_and_write(f, m)
+                            m = "--------------------"
+                            self.print_and_write(f, m)
+                            f.close()
                             break
 
         return callinjection
@@ -167,12 +174,17 @@ class GraphAnalyzer(object):
                 reentrancy = 0
                 if count > 5:
                     reentrancy = 1
-                    print("--------------------")
-                    # print(graph.graph['transaction_hash'])
-                    print(f"trace cycle found, number of turns: ", count)
+                    f = open("logs/subtrace_analysis", "a+")
+                    m = "--------------------"
+                    self.print_and_write(f, m)
+                    m = "trace cycle found, number of turns: " + str(count)
+                    self.print_and_write(f, m)
                     for node in cycle:
-                        print(node, "->")
-                    print("--------------------")
+                        m = node + "->"
+                        self.print_and_write(f, m)
+                    m = "--------------------"
+                    self.print_and_write(f, m)
+                    f.close()
         
         return reentrancy
 
