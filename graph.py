@@ -17,13 +17,13 @@ class DiGraphBuilder(object):
         return self.local.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,gas_used from traces where rowid = :trace_id", {'trace_id':traceid})
 
     def query_traces_bytime(self, from_time, to_time):
-        return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input from traces indexed by transaction_hash_index where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+        return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_bytx(self, transaction_hash):
-        return self.local.cur.execute("select * from subtraces where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+        return self.local.cur.execute("select * from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
 
     def query_txs_bytime(self, from_time, to_time):
-        return self.local.cur.execute("select distinct transaction_hash from traces indexed by transaction_hash_index where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+        return self.local.cur.execute("select distinct transaction_hash from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def build_digraph_on_traces(self, from_time, to_time):
         
@@ -110,7 +110,7 @@ class GraphAnalyzer(object):
         cycles = list(nx.simple_cycles(subtrace_graph))
         reentrancy = self.check_reentrancy(subtrace_graph, cycles)
         callinjection = self.check_callinjection(subtrace_graph, cycles)
-        fun = reentrancy > -1 or callinjection
+        fun = reentrancy > 0 or callinjection
         if reentrancy > 0 or callinjection:
             f = open("logs/subtrace_analysis", "a+")
             m = subtrace_graph.graph['transaction_hash']
@@ -120,9 +120,9 @@ class GraphAnalyzer(object):
                 m = "Reentrancy Attack Found!"
                 self.print_and_write(f, m)
             if callinjection:
-                m = "Call Injection Attack Mipht Found!"
+                m = "Call Injection Attack Might Found!"
                 self.print_and_write(f, m)
-            m = "########################################"
+            m = "########################################\n"
             self.print_and_write(f, m)
             f.close()
 
@@ -139,11 +139,12 @@ class GraphAnalyzer(object):
                 for index in range(0, len(data['id'])):
                     id = data['id'][index]
                     parent_trace_id = data['parent_trace_id'][index]
-                    if parent_trace_id == None:
+                    gas_used = data['gas_used'][index]
+                    if parent_trace_id == None or gas_used == None:
                         continue
                     trace_input = self.query_input_byid(id).fetchone()['input']          
                     parent_trace_input = self.query_input_byid(parent_trace_id).fetchone()['input']
-                    if len(trace_input) > 10 and len(parent_trace_input) > 10:
+                    if len(trace_input) > 10 and len(parent_trace_input) > 10 and gas_used > 0:
                         method_hash = trace_input[2:10]
                         if method_hash in parent_trace_input:
                             callinjection = True
@@ -221,6 +222,7 @@ def main():
     builder = DiGraphBuilder(DB_FILEPATH)
     analyzer = GraphAnalyzer(builder.local)
 
+    # from_time = datetime(2018, 8, 1, 8, 0, 0)
     from_time = datetime(2018, 8, 1, 9, 0, 0)
     to_time = datetime(2018, 12, 25, 0, 0, 0)
     # to_time = from_time + timedelta(hours=1)
