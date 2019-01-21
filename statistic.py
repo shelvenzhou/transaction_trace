@@ -65,6 +65,8 @@ class Statistic(object):
                  attr = trace['trace_type']
             if trace['trace_address'] == None:
                 trace_address = ''
+            else:
+                trace_address = trace['trace_address']
             tx2hash[tx_hash]['subtraces'].append((trace['from_address'], trace['to_address'], trace_address, attr))
             tx2hash[tx_hash]['countnow'] += 1
 
@@ -75,14 +77,21 @@ class Statistic(object):
         return tx2hash
 
     def hash_analysis(self, from_time, to_time):
-        tx2hash = self.hash_traces_bytime(from_time, to_time)
         hash2tx = {}
-        for tx in tx2hash.keys():
-            subtraces_hash = tx2hash[tx]['subtraces_hash']
-            if subtraces_hash in hash2tx.keys():
-                hash2tx[subtraces_hash].append(tx)
-            else:
-                hash2tx[subtraces_hash] = [tx]
+        start_time = from_time
+        end_time = start_time + timedelta(days=1)
+        while start_time < to_time:
+            print(time_to_str(start_time), " - ", time_to_str(end_time))
+            tx2hash = self.hash_traces_bytime(start_time, end_time)
+            for tx in tx2hash.keys():
+                subtraces_hash = tx2hash[tx]['subtraces_hash']
+                if subtraces_hash in hash2tx.keys():
+                    hash2tx[subtraces_hash].append(tx)
+                else:
+                    hash2tx[subtraces_hash] = [tx]
+            start_time = end_time
+            end_time = start_time + timedelta(days=1)
+
         print(len(hash2tx.keys()), "trace hash")
         tx_company = {}
         for subtrace_hash in hash2tx.keys():
@@ -92,8 +101,7 @@ class Statistic(object):
 
         with open(STATISTIC_ANALYSIS_FILEPATH, "w") as f:
             for tx in tx_company.keys():
-                if tx_company[tx] < 10:
-                    
+                if tx_company[tx] < 10:          
                     f.write(tx + " " + str(tx_company[tx]) + "\n")
         import IPython;IPython.embed()
 
@@ -104,7 +112,7 @@ def main():
     to_time = datetime(2018, 10, 7, 0, 40, 0)
     # to_time = from_time + timedelta(hours=1)
     while from_time < datetime(2018, 10, 7, 0, 0, 0):
-        print("Statistic analysis from ", time_to_str(from_time), " to ", time_to_str(to_time))
+        print("Statistic analysis from", time_to_str(from_time), "to", time_to_str(to_time))
         analyzer.hash_analysis(from_time, to_time)
 
         from_time = to_time
