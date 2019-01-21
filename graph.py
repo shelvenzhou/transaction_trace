@@ -5,6 +5,7 @@ from datetime import datetime,timedelta
 import sys
 
 DB_FILEPATH = "/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3"
+SUBTRACE_ANALYSIS_FILEPATH = "logs/subtrace_analysis"
 
 class DiGraphBuilder(object):
     def __init__(self, db_filepath=DB_FILEPATH):
@@ -112,7 +113,7 @@ class GraphAnalyzer(object):
         callinjection = self.check_callinjection(subtrace_graph, cycles)
         fun = reentrancy > 0 or callinjection
         if reentrancy > 0 or callinjection:
-            f = open("logs/subtrace_analysis", "a+")
+            f = open(SUBTRACE_ANALYSIS_FILEPATH, "a+")
             m = subtrace_graph.graph['transaction_hash']
             print(m)
             f.write(m + "\n")
@@ -148,7 +149,7 @@ class GraphAnalyzer(object):
                         method_hash = trace_input[2:10]
                         if method_hash in parent_trace_input:
                             callinjection = True
-                            f = open("logs/subtrace_analysis", "a+")
+                            f = open(SUBTRACE_ANALYSIS_FILEPATH, "a+")
                             m = "--------------------"
                             self.print_and_write(f, m)
                             m = cycle[0]
@@ -175,7 +176,7 @@ class GraphAnalyzer(object):
                 reentrancy = 0
                 if count > 5:
                     reentrancy = 1
-                    f = open("logs/subtrace_analysis", "a+")
+                    f = open(SUBTRACE_ANALYSIS_FILEPATH, "a+")
                     m = "--------------------"
                     self.print_and_write(f, m)
                     m = "trace cycle found, number of turns: " + str(count)

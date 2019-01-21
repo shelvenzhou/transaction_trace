@@ -88,7 +88,7 @@ class EthereumDatabase(object):
             CREATE TABLE subtraces(
                 transaction_hash TEXT,
                 id INT PRIMARY KEY,
-                parent_trace_id INT,
+                parent_trace_id INT
             );
         """)
 
