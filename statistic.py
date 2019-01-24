@@ -46,6 +46,7 @@ class Statistic(object):
         tx2hash = {}
         traces = self.query_traces_bytime(from_time, to_time).fetchall()
         print(len(traces), "traces")
+        count = 0
         for trace in traces:
             tx_hash = trace['transaction_hash']
             if tx_hash not in tx2hash.keys():
@@ -73,6 +74,10 @@ class Statistic(object):
             if tx2hash[tx_hash]['countnow'] == tx2hash[tx_hash]['subtraces_count']:
                 tx2hash[tx_hash]['subtraces_hash'] = self.hash_subtraces(tx2hash[tx_hash]['subtraces'])
                 tx2hash[tx_hash]['subtraces'] = None
+
+            count += 1
+            sys.stdout.write(str(count) + '\r')
+            sys.stdout.flush()
         print(len(tx2hash.keys()), "transactions")
         return tx2hash
 
@@ -81,7 +86,7 @@ class Statistic(object):
         start_time = from_time
         end_time = start_time + timedelta(days=1)
         while start_time < to_time:
-            print(time_to_str(start_time), " - ", time_to_str(end_time))
+            print(time_to_str(start_time), "-", time_to_str(end_time))
             tx2hash = self.hash_traces_bytime(start_time, end_time)
             for tx in tx2hash.keys():
                 subtraces_hash = tx2hash[tx]['subtraces_hash']
@@ -99,7 +104,7 @@ class Statistic(object):
             for tx in hash2tx[subtrace_hash]:
                 tx_company[tx] = company
 
-        with open(STATISTIC_ANALYSIS_FILEPATH, "w") as f:
+        with open(STATISTIC_ANALYSIS_FILEPATH, "w+") as f:
             for tx in tx_company.keys():
                 if tx_company[tx] < 10:          
                     f.write(tx + " " + str(tx_company[tx]) + "\n")
