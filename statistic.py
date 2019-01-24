@@ -22,28 +22,27 @@ class Statistic(object):
     def query_subtraces_count_bytx(self, transaction_hash):
         return self.local.cur.execute("select count(*) from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
 
-    
-
     def hash_subtraces(self, subtraces):
         subtraces.sort(key=sort_by_trace_address)
         address_map = {}
         symbolic_subtraces = []
         for subtrace in subtraces:
             symbolic_subtrace = []
-            for i in range(0,2):
+            for i in range(1,3):
                 if subtrace[i] in address_map.keys():
                     symbolic_subtrace.append(address_map[subtrace[i]])
                 else:
                     symbol = len(address_map.keys())
                     address_map[subtrace[i]] = symbol
                     symbolic_subtrace.append(symbol)
-            symbolic_subtrace.append(subtrace[3])
+            symbolic_subtrace.append(subtrace[4])
             symbolic_subtraces.append(symbolic_subtrace)
         m = hashlib.sha256(str(symbolic_subtraces).encode('utf-8'))
         return '0x' + m.hexdigest()
 
-    def hash_traces_bytime(self, from_time, to_time):
+    def build_trace_graph(self, from_time, to_time):
         tx2hash = {}
+        trace_graph = nx.DiGraph()
         traces = self.query_traces_bytime(from_time, to_time).fetchall()
         print(len(traces), "traces")
         count = 0
@@ -68,47 +67,29 @@ class Statistic(object):
                 trace_address = ''
             else:
                 trace_address = trace['trace_address']
-            tx2hash[tx_hash]['subtraces'].append((trace['from_address'], trace['to_address'], trace_address, attr))
+            tx2hash[tx_hash]['subtraces'].append((trace['rowid'], trace['from_address'], trace['to_address'], trace_address, attr))
             tx2hash[tx_hash]['countnow'] += 1
 
             if tx2hash[tx_hash]['countnow'] == tx2hash[tx_hash]['subtraces_count']:
                 tx2hash[tx_hash]['subtraces_hash'] = self.hash_subtraces(tx2hash[tx_hash]['subtraces'])
+                for subtrace in tx2hash[tx_hash]['subtraces']:
+                    rowid = subtrace[0]
+                    from_address = subtrace[1]
+                    to_address = subtrace[2]
+                    subtraces_hash = tx2hash[tx_hash]['subtraces_hash']
+                    trace_graph.add_edge(from_address, to_address)
+                    if subtraces_hash not in trace_graph[from_address][to_address]:
+                        trace_graph[from_address][to_address][subtraces_hash] = []
+                    trace_graph[from_address][to_address][subtraces_hash].append(rowid)
+
                 tx2hash[tx_hash]['subtraces'] = None
 
             count += 1
             sys.stdout.write(str(count) + '\r')
             sys.stdout.flush()
+
         print(len(tx2hash.keys()), "transactions")
-        return tx2hash
-
-    def hash_analysis(self, from_time, to_time):
-        hash2tx = {}
-        start_time = from_time
-        end_time = start_time + timedelta(days=1)
-        while start_time < to_time:
-            print(time_to_str(start_time), "-", time_to_str(end_time))
-            tx2hash = self.hash_traces_bytime(start_time, end_time)
-            for tx in tx2hash.keys():
-                subtraces_hash = tx2hash[tx]['subtraces_hash']
-                if subtraces_hash in hash2tx.keys():
-                    hash2tx[subtraces_hash].append(tx)
-                else:
-                    hash2tx[subtraces_hash] = [tx]
-            start_time = end_time
-            end_time = start_time + timedelta(days=1)
-
-        print(len(hash2tx.keys()), "trace hash")
-        tx_company = {}
-        for subtrace_hash in hash2tx.keys():
-            company = len(hash2tx[subtrace_hash])
-            for tx in hash2tx[subtrace_hash]:
-                tx_company[tx] = company
-
-        with open(STATISTIC_ANALYSIS_FILEPATH, "w+") as f:
-            for tx in tx_company.keys():
-                if tx_company[tx] < 10:          
-                    f.write(tx + " " + str(tx_company[tx]) + "\n")
-        import IPython;IPython.embed()
+        return trace_graph
 
 def main():
     analyzer = Statistic(DB_FILEPATH)
@@ -118,8 +99,8 @@ def main():
     # to_time = from_time + timedelta(hours=1)
     while from_time < datetime(2018, 10, 7, 0, 0, 0):
         print("Statistic analysis from", time_to_str(from_time), "to", time_to_str(to_time))
-        analyzer.hash_analysis(from_time, to_time)
-
+        trace_graph = analyzer.build_trace_graph(from_time, to_time)
+        import IPython;IPython.embed()
         from_time = to_time
         to_time = from_time + timedelta(hours=1)
 

@@ -27,8 +27,9 @@ def main():
         except:
             print("datebase already exists")
 
+        print(f"date:", date_to_str(date))
         while from_time.date() == date:
-            print(f"date:", date_to_str(date))
+            
             print(f"query from {from_time} to {to_time}...")
             rows = remote.get_ethereum_data(from_time, to_time)
 
