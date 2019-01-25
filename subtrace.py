@@ -1,6 +1,6 @@
 import sqlite3
 from local.ethereum_database import EthereumDatabase
-from datetime_utils import time_to_str
+from datetime_utils import time_to_str,date_to_str,str_to_time
 from datetime import datetime,timedelta
 import decimal
 
@@ -27,7 +27,10 @@ class SubTraceBuilder(object):
         self.local = EthereumDatabase(db_filepath)
 
     def query_db(self, from_time, to_time):
-        return self.local.cur.execute("select rowid,* from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+        if from_time == None:
+            return self.local.cur.execute("select rowid,* from traces")
+        else:
+            return self.local.cur.execute("select rowid,* from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def write_db(self, st):
         try:
@@ -35,7 +38,7 @@ class SubTraceBuilder(object):
         except sqlite3.Error as e:
             print(e)
 
-    def build_subtrace(self, from_time, to_time):
+    def build_subtrace(self, from_time=None, to_time=None):
         traceoftxs = {}
         re = self.query_db(from_time, to_time)
         try:
@@ -86,6 +89,13 @@ class SubTraceBuilder(object):
 
         self.local.database_commit()
         traceoftxs = {}
+
+    def build_subtrace_on_multidb(self, from_time, to_time):
+        date = from_time.date()
+        while date <= to_time.date():
+            self.local = EthereumDatabase(f"/Users/Still/Desktop/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+            self.build_subtrace()
+            date += timedelta(days=1)
 
 def main():
     builder = SubTraceBuilder(DB_FILEPATH)

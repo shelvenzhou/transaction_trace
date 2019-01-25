@@ -9,7 +9,7 @@ DB_FILEPATH = "/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3"
 STATISTIC_ANALYSIS_FILEPATH = "logs/statistic_analysis"
 
 def sort_by_trace_address(subtrace):
-        return subtrace[2]
+        return subtrace[3]
 
 class Statistic(object):
     def __init__(self, db_filepath=DB_FILEPATH):
@@ -17,10 +17,13 @@ class Statistic(object):
         self.builder = DiGraphBuilder(DB_FILEPATH)
 
     def query_traces_bytime(self, from_time, to_time):
-        return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+        if from_time == None:
+            return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input,trace_type,trace_address from traces")
+        else:
+            return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_count_bytx(self, transaction_hash):
-        return self.local.cur.execute("select count(*) from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+        return self.local.cur.execute("select count(*) from subtraces where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
 
     def hash_subtraces(self, subtraces):
         subtraces.sort(key=sort_by_trace_address)
@@ -40,9 +43,12 @@ class Statistic(object):
         m = hashlib.sha256(str(symbolic_subtraces).encode('utf-8'))
         return '0x' + m.hexdigest()
 
-    def build_trace_graph(self, from_time, to_time):
+    def build_trace_graph(self, graph=None, from_time=None, to_time=None):
         tx2hash = {}
-        trace_graph = nx.DiGraph()
+        if graph == None:
+            trace_graph = nx.DiGraph()
+        else:
+            trace_graph = graph
         traces = self.query_traces_bytime(from_time, to_time).fetchall()
         print(len(traces), "traces")
         count = 0
@@ -89,6 +95,15 @@ class Statistic(object):
             sys.stdout.flush()
 
         print(len(tx2hash.keys()), "transactions")
+        return trace_graph
+
+    def build_trace_graph_on_multidb(self, from_time, to_time):
+        date = from_time.date()
+        trace_graph = None
+        while date <= to_time.date():
+            self.local = EthereumDatabase(f"/Users/Still/Desktop/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+            trace_graph = self.build_trace_graph(trace_graph)
+            date += timedelta(days=1)
         return trace_graph
 
 def main():
