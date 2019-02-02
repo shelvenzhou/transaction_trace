@@ -93,20 +93,16 @@ class SubTraceBuilder(object):
     def build_subtrace_on_multidb(self, from_time, to_time):
         date = from_time.date()
         while date <= to_time.date():
-            self.local = EthereumDatabase(f"/Users/Still/Desktop/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+            self.local = EthereumDatabase(f"/home/jay/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
             self.build_subtrace()
             date += timedelta(days=1)
 
 def main():
     builder = SubTraceBuilder(DB_FILEPATH)
     from_time = datetime(2018, 8, 1, 9, 0, 0)
-    to_time = from_time + timedelta(hours=2)
+    to_time = datetime(2018, 8, 1, 9, 0, 0)
 
-    while from_time < datetime(2018, 12, 25, 0, 0, 0):
-        print("building subtraces from", time_to_str(from_time), "to", time_to_str(to_time))
-        builder.build_subtrace(from_time, to_time)
-        from_time = to_time
-        to_time = from_time + timedelta(hours=2)
+    builder.build_subtrace_on_multidb(from_time, to_time)
 
 
 
