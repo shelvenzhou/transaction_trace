@@ -2,9 +2,7 @@ import sqlite3
 from local.ethereum_database import EthereumDatabase
 from datetime_utils import time_to_str,date_to_str,str_to_time
 from datetime import datetime,timedelta
-import decimal
-
-DB_FILEPATH = "/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3"
+import decimal,sys
 
 
 class SubTrace(object):
@@ -23,8 +21,8 @@ class SubTrace(object):
 
 class SubTraceBuilder(object):
 
-    def __init__(self, db_filepath=DB_FILEPATH):
-        self.local = EthereumDatabase(db_filepath)
+    def __init__(self):
+        self.local = None
 
     def query_db(self, from_time, to_time):
         if from_time == None:
@@ -38,10 +36,14 @@ class SubTraceBuilder(object):
         except sqlite3.Error as e:
             print(e)
 
+    def clear_subtraces(self):
+        self.local.cur.execute("delete from subtraces")
+
     def build_subtrace(self, from_time=None, to_time=None):
         traceoftxs = {}
         re = self.query_db(from_time, to_time)
         try:
+            trace_count = 0
             for row in re:
                 if row['trace_address'] != None:
                     trace_addr = row['trace_address'].split(',')
@@ -68,6 +70,11 @@ class SubTraceBuilder(object):
                     trace_map = {}
                     trace_map[st.level] = {st.seq:row['rowid']}
                     traceoftxs[txhash] = {'traces':traces, 'trace_map':trace_map}
+
+                trace_count += 1
+                sys.stdout.write(str(trace_count) + '\r')
+                sys.stdout.flush()
+            print(trace_count, "traces")
         except sqlite3.DatabaseError as e:
             error = time_to_str(from_time) + " " + time_to_str(to_time) + " " + str(e)
             print(error)
@@ -75,6 +82,7 @@ class SubTraceBuilder(object):
                 f.write(error)
             return
 
+        tx_count = 0 
         for tx in traceoftxs.keys():
             for st in traceoftxs[tx]['traces']:
                 parent_level = st.parent_level
@@ -86,6 +94,10 @@ class SubTraceBuilder(object):
                     except:
                         print(f"parent not found for {st.id}")
                 self.write_db(st)
+            tx_count += 1
+            sys.stdout.write(str(tx_count) + '\r')
+            sys.stdout.flush()
+        print(tx_count, "txs")
 
         self.local.database_commit()
         traceoftxs = {}
@@ -93,14 +105,16 @@ class SubTraceBuilder(object):
     def build_subtrace_on_multidb(self, from_time, to_time):
         date = from_time.date()
         while date <= to_time.date():
+            print('building subtraces on', date_to_str(date))
             self.local = EthereumDatabase(f"/home/jay/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+            self.clear_subtraces()
             self.build_subtrace()
             date += timedelta(days=1)
 
 def main():
-    builder = SubTraceBuilder(DB_FILEPATH)
-    from_time = datetime(2018, 8, 1, 9, 0, 0)
-    to_time = datetime(2018, 8, 1, 9, 0, 0)
+    builder = SubTraceBuilder()
+    from_time = datetime(2018, 12, 1, 0, 0, 0)
+    to_time = datetime(2018, 12, 23, 0, 0, 0)
 
     builder.build_subtrace_on_multidb(from_time, to_time)
 
