@@ -109,6 +109,7 @@ class SubTraceBuilder(object):
             self.local = EthereumDatabase(f"/home/jay/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
             self.clear_subtraces()
             self.build_subtrace()
+            self.local.database_index_create()
             date += timedelta(days=1)
 
 def main():

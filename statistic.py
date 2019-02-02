@@ -1,21 +1,20 @@
 import networkx as nx
 from local.ethereum_database import EthereumDatabase
 from graph import DiGraphBuilder
-from datetime_utils import time_to_str
-from datetime import datetime,timedelta
+from datetime_utils import time_to_str,date_to_str
+from datetime import datetime,timedelta,date
 import sys, hashlib
 
-DB_FILEPATH = "/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3"
+DB_PATH = "/Users/Still/Desktop/w/db/"
 STATISTIC_ANALYSIS_FILEPATH = "logs/statistic_analysis"
 
 def sort_by_trace_address(subtrace):
         return subtrace[3]
 
 class Statistic(object):
-    def __init__(self, db_filepath=DB_FILEPATH):
-        self.local = EthereumDatabase(db_filepath)
-        self.builder = DiGraphBuilder(DB_FILEPATH)
-
+    def __init__(self, db_date, db_path=DB_PATH):
+        self.local = EthereumDatabase(f"{db_path}bigquery_ethereum_{date_to_str(db_date)}.sqlite3")
+        
     def query_traces_bytime(self, from_time, to_time):
         if from_time == None:
             return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input,trace_type,trace_address from traces")
@@ -23,7 +22,7 @@ class Statistic(object):
             return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_count_bytx(self, transaction_hash):
-        return self.local.cur.execute("select count(*) from subtraces where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+        return self.local.cur.execute("select count(*) from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
 
     def hash_subtraces(self, subtraces):
         subtraces.sort(key=sort_by_trace_address)
@@ -101,23 +100,20 @@ class Statistic(object):
         date = from_time.date()
         trace_graph = None
         while date <= to_time.date():
+            print(date_to_str(date))
             self.local = EthereumDatabase(f"/Users/Still/Desktop/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
             trace_graph = self.build_trace_graph(trace_graph)
             date += timedelta(days=1)
         return trace_graph
 
 def main():
-    analyzer = Statistic(DB_FILEPATH)
+    from_time = datetime(2018, 10, 7, 0, 0, 0)
+    date = from_time.date()
+    analyzer = Statistic(date, DB_PATH)
 
-    from_time = datetime(2018, 10, 5, 6, 0, 0)
-    to_time = datetime(2018, 10, 7, 0, 40, 0)
-    # to_time = from_time + timedelta(hours=1)
-    while from_time < datetime(2018, 10, 7, 0, 0, 0):
-        print("Statistic analysis from", time_to_str(from_time), "to", time_to_str(to_time))
-        trace_graph = analyzer.build_trace_graph(from_time, to_time)
-        import IPython;IPython.embed()
-        from_time = to_time
-        to_time = from_time + timedelta(hours=1)
+    print("Statistic analysis on", date_to_str(date))
+    trace_graph = analyzer.build_trace_graph()
+    import IPython;IPython.embed()
 
 if __name__ == "__main__":
     main()
