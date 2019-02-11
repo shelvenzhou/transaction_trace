@@ -3,7 +3,7 @@ from local.ethereum_database import EthereumDatabase
 from graph import DiGraphBuilder
 from datetime_utils import time_to_str,date_to_str
 from datetime import datetime,timedelta,date
-import sys, hashlib
+import sys,hashlib,gc
 
 DB_PATH = "/Users/Still/Desktop/w/db/"
 STATISTIC_ANALYSIS_FILEPATH = "logs/statistic_analysis"
@@ -13,13 +13,14 @@ def sort_by_trace_address(subtrace):
 
 class Statistic(object):
     def __init__(self, db_date, db_path=DB_PATH):
+        self.db_path = db_path
         self.local = EthereumDatabase(f"{db_path}bigquery_ethereum_{date_to_str(db_date)}.sqlite3")
         
     def query_traces_bytime(self, from_time, to_time):
         if from_time == None:
-            return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input,trace_type,trace_address from traces")
+            return self.local.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces")
         else:
-            return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+            return self.local.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_count_bytx(self, transaction_hash):
         return self.local.cur.execute("select count(*) from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
@@ -72,20 +73,20 @@ class Statistic(object):
                 trace_address = ''
             else:
                 trace_address = trace['trace_address']
-            tx2hash[tx_hash]['subtraces'].append((trace['rowid'], trace['from_address'], trace['to_address'], trace_address, attr))
+            tx2hash[tx_hash]['subtraces'].append((trace['transaction_hash'], trace['from_address'], trace['to_address'], trace_address, attr))
             tx2hash[tx_hash]['countnow'] += 1
 
             if tx2hash[tx_hash]['countnow'] == tx2hash[tx_hash]['subtraces_count']:
                 tx2hash[tx_hash]['subtraces_hash'] = self.hash_subtraces(tx2hash[tx_hash]['subtraces'])
                 for subtrace in tx2hash[tx_hash]['subtraces']:
-                    rowid = subtrace[0]
                     from_address = subtrace[1]
                     to_address = subtrace[2]
                     subtraces_hash = tx2hash[tx_hash]['subtraces_hash']
                     trace_graph.add_edge(from_address, to_address)
                     if subtraces_hash not in trace_graph[from_address][to_address]:
                         trace_graph[from_address][to_address][subtraces_hash] = []
-                    trace_graph[from_address][to_address][subtraces_hash].append(rowid)
+                    if tx_hash not in trace_graph[from_address][to_address][subtraces_hash]:
+                        trace_graph[from_address][to_address][subtraces_hash].append(tx_hash)
 
                 tx2hash[tx_hash]['subtraces'] = None
 
@@ -101,9 +102,10 @@ class Statistic(object):
         trace_graph = None
         while date <= to_time.date():
             print(date_to_str(date))
-            self.local = EthereumDatabase(f"/Users/Still/Desktop/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
-            trace_graph = self.build_trace_graph(trace_graph)
+            self.local = EthereumDatabase(f"{self.db_path}bigquery_ethereum_{date_to_str(date)}.sqlite3")
+            trace_graph = self.build_trace_graph(graph=trace_graph)
             date += timedelta(days=1)
+            gc.collect()
         return trace_graph
 
 def main():
@@ -113,6 +115,11 @@ def main():
 
     print("Statistic analysis on", date_to_str(date))
     trace_graph = analyzer.build_trace_graph()
+
+    # to_time = datetime(2018, 10, 7, 0, 0, 0)
+    # print("Statistic analysis from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
+    # trace_graph = analyzer.build_trace_graph_on_multidb(from_time, to_time)
+
     import IPython;IPython.embed()
 
 if __name__ == "__main__":
