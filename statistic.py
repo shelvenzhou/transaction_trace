@@ -107,6 +107,25 @@ class Statistic(object):
             date += timedelta(days=1)
             gc.collect()
         return trace_graph
+    
+    def analyze(self,trace_graph):
+        txs = {}
+        edges = trace_graph.edges()
+        for e in edges:
+            data = trace_graph.get_edge_data(*e)
+            hash_count = {}
+            max_count = 0
+            for h in data:
+                hash_count[h] = len(data[h])
+                if hash_count[h] > max_count:
+                    max_count = hash_count[h]
+            for h in data:
+                for tx in data[h]:
+                    if tx not in txs:
+                        txs[tx] = []
+                    txs[tx].append(max_count/hash_count[h])
+
+        return txs
 
 def main():
     from_time = datetime(2018, 10, 7, 0, 0, 0)
@@ -115,6 +134,7 @@ def main():
 
     print("Statistic analysis on", date_to_str(date))
     trace_graph = analyzer.build_trace_graph()
+    txs = analyzer.analyze(trace_graph)
 
     # to_time = datetime(2018, 10, 7, 0, 0, 0)
     # print("Statistic analysis from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
