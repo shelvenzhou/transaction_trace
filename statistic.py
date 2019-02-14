@@ -109,25 +109,29 @@ class Statistic(object):
             date += timedelta(days=1)
             gc.collect()
         return trace_graph
-    
-    def analyze(self,trace_graph):
-        tx_frequencey = {}
-        edges = trace_graph.edges()
-        for e in edges:
-            data = trace_graph.get_edge_data(*e)
+
+    def analyze_nodes(self, trace_graph):
+        tx_attr = {}
+        node_attr = {}
+        nodes = trace_graph.nodes(data=True)
+        for node in nodes:
+            node_addr = node[0]
+            node_attr[node_addr] = []
             hash_count = {}
             max_count = 0
-            for h in data:
-                hash_count[h] = len(data[h])
+            for h in node[1]:
+                hash_count[h] = len(node[1][h])
                 if hash_count[h] > max_count:
                     max_count = hash_count[h]
-            for h in data:
-                for tx in data[h]:
-                    if tx not in tx_frequencey:
-                        tx_frequencey[tx] = []
-                    tx_frequencey[tx].append(max_count/hash_count[h])
+            for h in node[1]:
+                ratio = max_count/hash_count[h]
+                node_attr[node_addr].append(hash_count[h])
+                for tx in node[1][h]:
+                    if tx not in tx_attr:
+                        tx_attr[tx] = []
+                    tx_attr[tx].append(ratio)
 
-        return tx_frequencey
+        return (tx_attr, node_attr)
 
 def main():
     from_time = datetime(2018, 10, 7, 0, 0, 0)
@@ -136,7 +140,7 @@ def main():
 
     print("Statistic analysis on", date_to_str(date))
     trace_graph = analyzer.build_trace_graph()
-    tx_frequencey = analyzer.analyze(trace_graph)
+    (tx_attr, node_attr) = analyzer.analyze_nodes(trace_graph)
 
     # to_time = datetime(2018, 10, 7, 0, 0, 0)
     # print("Statistic analysis from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
