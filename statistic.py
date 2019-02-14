@@ -83,10 +83,12 @@ class Statistic(object):
                     to_address = subtrace[2]
                     subtraces_hash = tx2hash[tx_hash]['subtraces_hash']
                     trace_graph.add_edge(from_address, to_address)
-                    if subtraces_hash not in trace_graph[from_address][to_address]:
-                        trace_graph[from_address][to_address][subtraces_hash] = []
-                    if tx_hash not in trace_graph[from_address][to_address][subtraces_hash]:
-                        trace_graph[from_address][to_address][subtraces_hash].append(tx_hash)
+
+                    for addr in (from_address, to_address):
+                        if subtraces_hash not in trace_graph.node[addr]:
+                            trace_graph.node[addr][subtraces_hash] = []
+                        if tx_hash not in trace_graph.node[addr][subtraces_hash]:
+                            trace_graph.node[addr][subtraces_hash].append(tx_hash)
 
                 tx2hash[tx_hash]['subtraces'] = None
 
@@ -109,7 +111,7 @@ class Statistic(object):
         return trace_graph
     
     def analyze(self,trace_graph):
-        txs = {}
+        tx_frequencey = {}
         edges = trace_graph.edges()
         for e in edges:
             data = trace_graph.get_edge_data(*e)
@@ -121,11 +123,11 @@ class Statistic(object):
                     max_count = hash_count[h]
             for h in data:
                 for tx in data[h]:
-                    if tx not in txs:
-                        txs[tx] = []
-                    txs[tx].append(max_count/hash_count[h])
+                    if tx not in tx_frequencey:
+                        tx_frequencey[tx] = []
+                    tx_frequencey[tx].append(max_count/hash_count[h])
 
-        return txs
+        return tx_frequencey
 
 def main():
     from_time = datetime(2018, 10, 7, 0, 0, 0)
@@ -134,7 +136,7 @@ def main():
 
     print("Statistic analysis on", date_to_str(date))
     trace_graph = analyzer.build_trace_graph()
-    txs = analyzer.analyze(trace_graph)
+    tx_frequencey = analyzer.analyze(trace_graph)
 
     # to_time = datetime(2018, 10, 7, 0, 0, 0)
     # print("Statistic analysis from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
