@@ -43,9 +43,7 @@ class Statistic(object):
         m = hashlib.sha256(str(symbolic_subtraces).encode('utf-8'))
         return '0x' + m.hexdigest()
 
-    def build_trace_graph(self, graph=None, tx2hash=None, from_time=None, to_time=None):
-        if tx2hash == None:
-            tx2hash = {}
+    def build_trace_graph(self, tx2hash, graph=None, from_time=None, to_time=None):
         if graph == None:
             trace_graph = nx.DiGraph()
         else:
@@ -96,7 +94,7 @@ class Statistic(object):
             sys.stdout.flush()
 
         print(len(tx2hash.keys()), "transactions")
-        return (trace_graph, tx2hash)
+        return trace_graph
 
     def build_trace_graph_on_multidb(self, from_time, to_time, tx2hash=None):
         date = from_time.date()
@@ -104,22 +102,21 @@ class Statistic(object):
         while date <= to_time.date():
             print(date_to_str(date))
             self.local = EthereumDatabase(f"{self.db_path}bigquery_ethereum_{date_to_str(date)}.sqlite3")
-            (trace_graph, tx2hash) = self.build_trace_graph(graph=trace_graph, tx2hash=tx2hash)
+            trace_graph = self.build_trace_graph(graph=trace_graph, tx2hash=tx2hash)
             date += timedelta(days=1)
-            gc.collect()
-        return (trace_graph, tx2hash)
+        return trace_graph
 
     def build_graph_when_poor(self, from_time, to_time):
         start = from_time
         end = from_time + timedelta(days=6)
-        tx_attr = node_attr = hash2tx = tx2hash = None
+        tx2hash = {}
         while start < to_time:
-            (trace_graph, tx2hash) = self.build_trace_graph_on_multidb(start, end)
-            (tx_attr, node_attr, hash2tx) = self.extract_from_graph(trace_graph, tx_attr, node_attr, hash2tx)
-            trace_graph = None
+            trace_graph = self.build_trace_graph_on_multidb(start, end)
+            (tx_attr, node_attr, hash2tx) = self.extract_from_graph(trace_graph)
+            del trace_graph
             gc.collect()
             start = end + timedelta(days=1)
-            end = timedelta(days=6)
+            end += timedelta(days=6)
             if end > to_time:
                 end = to_time
 
@@ -174,16 +171,18 @@ def main():
     analyzer = Statistic(date, DB_PATH)
 
     print("Statistic analysis on", date_to_str(date))
-    (trace_graph, tx2hash) = analyzer.build_trace_graph()
+    tx2hash = {}
+    trace_graph = analyzer.build_trace_graph(tx2hash=tx2hash)
     (tx_attr, node_attr, hash2tx) = analyzer.extract_from_graph(trace_graph)
-    import IPython;IPython.embed()
-    trace_graph = None
+    del trace_graph
     gc.collect()
     analyzer.analyze(tx_attr, node_attr, hash2tx, tx2hash)
 
-    # to_time = datetime(2018, 10, 7, 0, 0, 0)
+    # to_time = datetime(2018, 10, 20, 0, 0, 0)
     # print("Statistic analysis from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
-    # (trace_graph, tx2hash) = analyzer.build_trace_graph_on_multidb(from_time, to_time)
+    # trace_graph = analyzer.build_trace_graph_on_multidb(from_time, to_time)
+    # (tx_attr, node_attr) = analyzer.analyze_nodes(trace_graph)
+    # analyzer.build_graph_when_poor(from_time, to_time)
 
     # import IPython;IPython.embed()
 
