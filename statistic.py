@@ -1,9 +1,11 @@
 import networkx as nx
 from local.ethereum_database import EthereumDatabase
 from graph import DiGraphBuilder
-from datetime_utils import time_to_str,date_to_str
+from datetime_utils import time_to_str,date_to_str,month_to_str
 from datetime import datetime,timedelta,date
+import sqlite3
 import sys,hashlib,gc
+import pickle
 
 DB_PATH = "/Users/Still/Desktop/w/db/"
 STATISTIC_ANALYSIS_FILEPATH = "logs/statistic_analysis"
@@ -11,19 +13,91 @@ STATISTIC_ANALYSIS_FILEPATH = "logs/statistic_analysis"
 def sort_by_trace_address(subtrace):
         return subtrace[3]
 
+class StatisticDatabase(object):
+
+    def __init__(self, db_filepath):
+        self.db_filepath = db_filepath
+        self.conn = sqlite3.connect(
+            self.db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
+        self.cur = self.conn.cursor()
+
+    def __del__(self):
+        self.conn.close()
+
+    def database_create(self):
+        self.cur.execute("""
+            CREATE TABLE transactions(
+                transaction_hash TEXT PRIMARY KEY,
+                nodes_address TEXT,
+                trace_hash TEXT
+            )
+        """)
+
+        self.cur.execute("""
+            CREATE TABLE nodes(
+                node_address TEXT,
+                hash TEXT,
+                count INT,
+                PRIMARY KEY(node_address, hash)
+            )
+        """)
+
+    def database_index_create(self):
+        self.cur.execute("""
+            CREATE INDEX transaction_hash_index on transactions(transaction_hash)
+        """)
+
+        self.cur.execute("""
+            CREATE INDEX node_address_index on nodes(node_address)
+        """)
+
+    def database_commit(self):
+        self.conn.commit()
+
+    def database_insert(self, tx_attr, node_attr, hash2tx):
+        for tx in tx_attr:
+            nodes_address = list(tx_attr[tx].keys())
+            self.cur.execute("""
+                INSERT INTO transactions(transaction_hash, nodes_address)
+                VALUES(?, ?);
+            """, (tx, str(nodes_address)))
+
+        for h in hash2tx:
+            for tx in hash2tx[h]:
+                self.cur.execute("""
+                    UPDATE transactions SET trace_hash = :trace_hash WHERE transaction_hash = :tx_hash
+                """, {"trace_hash": h, "tx_hash": tx})
+
+        for node in node_attr:
+            for h in node_attr[node]:
+                re = self.cur.execute("""
+                    SELECT count from nodes WHERE node_address = :node AND hash = :hash
+                """, {"node": node, "hash": h}).fetchall()
+                if len(re) == 0:
+                    self.cur.execute("""
+                        INSERT INTO nodes(node_address, hash, count)
+                        VALUES(?, ?, ?)
+                    """, (node, h, node_attr[node][h]))
+                else:
+                    self.cur.execute("""
+                        UPDATE nodes SET count = :count WHERE node_address = :node AND hash = :hash
+                    """, {"count": re[0]+node_attr[node][h], "node": node, "hash": h})
+
+
 class Statistic(object):
     def __init__(self, db_date, db_path=DB_PATH):
         self.db_path = db_path
-        self.local = EthereumDatabase(f"{db_path}bigquery_ethereum_{date_to_str(db_date)}.sqlite3")
+        self.raw = EthereumDatabase(f"{db_path}/raw/bigquery_ethereum_{date_to_str(db_date)}.sqlite3")
+        self.db = StatisticDatabase(f"{db_path}/statistic/statistic_{month_to_str(db_date)}.sqlite3")
         
     def query_traces_bytime(self, from_time, to_time):
         if from_time == None:
-            return self.local.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces")
+            return self.raw.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces limit 100000")
         else:
-            return self.local.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+            return self.raw.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_count_bytx(self, transaction_hash):
-        return self.local.cur.execute("select count(*) from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+        return self.raw.cur.execute("select count(*) from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
 
     def hash_subtraces(self, subtraces):
         subtraces.sort(key=sort_by_trace_address)
@@ -43,13 +117,14 @@ class Statistic(object):
         m = hashlib.sha256(str(symbolic_subtraces).encode('utf-8'))
         return '0x' + m.hexdigest()
 
-    def build_trace_graph(self, tx2hash, graph=None, from_time=None, to_time=None):
+    def build_trace_graph(self, graph=None, from_time=None, to_time=None):
         if graph == None:
             trace_graph = nx.DiGraph()
         else:
             trace_graph = graph
         traces = self.query_traces_bytime(from_time, to_time).fetchall()
         print(len(traces), "traces")
+        tx2hash = {}
         count = 0
         for trace in traces:
             tx_hash = trace['transaction_hash']
@@ -96,37 +171,20 @@ class Statistic(object):
         print(len(tx2hash.keys()), "transactions")
         return trace_graph
 
-    def build_trace_graph_on_multidb(self, from_time, to_time, tx2hash=None):
+    def build_trace_graph_on_multidb(self, from_time, to_time):
         date = from_time.date()
-        trace_graph = None
+        trace_graph = nx.DiGraph()
         while date <= to_time.date():
             print(date_to_str(date))
-            self.local = EthereumDatabase(f"{self.db_path}bigquery_ethereum_{date_to_str(date)}.sqlite3")
-            trace_graph = self.build_trace_graph(graph=trace_graph, tx2hash=tx2hash)
+            self.raw = EthereumDatabase(f"{self.db_path}/raw/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+            trace_graph = self.build_trace_graph(graph=trace_graph)
             date += timedelta(days=1)
         return trace_graph
 
-    def build_graph_when_poor(self, from_time, to_time):
-        start = from_time
-        end = from_time + timedelta(days=6)
-        tx2hash = {}
-        while start < to_time:
-            trace_graph = self.build_trace_graph_on_multidb(start, end)
-            (tx_attr, node_attr, hash2tx) = self.extract_from_graph(trace_graph)
-            del trace_graph
-            gc.collect()
-            start = end + timedelta(days=1)
-            end += timedelta(days=6)
-            if end > to_time:
-                end = to_time
-
-        self.analyze(tx_attr, node_attr, hash2tx, tx2hash)
-
-    def extract_from_graph(self, trace_graph, tx_attr=None, node_attr=None, hash2tx=None):
-        if tx_attr == None and node_attr == None:
-            tx_attr = {}
-            node_attr = {}
-            hash2tx = {}
+    def extract_from_graph(self, trace_graph):
+        tx_attr = {}
+        node_attr = {}
+        hash2tx = {}
         nodes = trace_graph.nodes(data=True)
         for node in nodes:
             node_addr = node[0]
@@ -140,10 +198,13 @@ class Statistic(object):
                     node_attr[node_addr][h] = hash_count[h]
                 else:
                     node_attr[node_addr][h] += hash_count[h]
+                if h not in hash2tx:
+                    hash2tx[h] = []
                 for tx in node[1][h]:
                     if tx not in tx_attr:
                         tx_attr[tx] = {}
                     tx_attr[tx][node_addr] = None
+                    hash2tx[h].append(tx)
 
         return (tx_attr, node_attr, hash2tx)
 
@@ -165,26 +226,38 @@ class Statistic(object):
         import IPython;IPython.embed()
         
 
-def main():
+def main(argv):
     from_time = datetime(2018, 10, 7, 0, 0, 0)
     date = from_time.date()
     analyzer = Statistic(date, DB_PATH)
 
-    print("Statistic analysis on", date_to_str(date))
-    tx2hash = {}
-    trace_graph = analyzer.build_trace_graph(tx2hash=tx2hash)
-    (tx_attr, node_attr, hash2tx) = analyzer.extract_from_graph(trace_graph)
-    del trace_graph
-    gc.collect()
-    analyzer.analyze(tx_attr, node_attr, hash2tx, tx2hash)
+    # print("Statistic analysis on", date_to_str(date))
+    # trace_graph = analyzer.build_trace_graph()
+    # (tx_attr, node_attr, hash2tx) = analyzer.extract_from_graph(trace_graph)
 
-    # to_time = datetime(2018, 10, 20, 0, 0, 0)
+    to_time = datetime(2018, 10, 7, 0, 0, 0)
+    print("Extract data from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
+    date = from_time.date()
+    while date <= to_time.date():
+        print(date_to_str(date))
+        analyzer.raw = EthereumDatabase(f"{analyzer.db_path}/raw/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+        analyzer.db = StatisticDatabase(f"{analyzer.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
+        try:
+            analyzer.db.database_create()
+        except:
+            print("datebase already exists")
+        trace_graph = analyzer.build_trace_graph()
+        (tx_attr, node_attr, hash2tx) = analyzer.extract_from_graph(trace_graph)
+        analyzer.db.database_insert(tx_attr, node_attr, hash2tx)
+        analyzer.db.database_commit()
+        print("statistic data inserted:", len(tx_attr.keys()), "transcations,", len(node_attr.keys()), "nodes,", len(hash2tx.keys()), "hashes")
+        del trace_graph, tx_attr, node_attr, hash2tx
+        gc.collect()
+        date += timedelta(days=1)
+
     # print("Statistic analysis from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
     # trace_graph = analyzer.build_trace_graph_on_multidb(from_time, to_time)
-    # (tx_attr, node_attr) = analyzer.analyze_nodes(trace_graph)
-    # analyzer.build_graph_when_poor(from_time, to_time)
-
-    # import IPython;IPython.embed()
+    import IPython;IPython.embed()
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
