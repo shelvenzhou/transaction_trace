@@ -3,6 +3,7 @@ from local.ethereum_database import EthereumDatabase
 from graph import DiGraphBuilder
 from datetime_utils import time_to_str,date_to_str,month_to_str
 from datetime import datetime,timedelta,date
+from dateutil.relativedelta import relativedelta
 import sqlite3
 import sys,hashlib,gc
 import pickle
@@ -81,7 +82,7 @@ class StatisticDatabase(object):
                 else:
                     self.cur.execute("""
                         UPDATE nodes SET count = :count WHERE node_address = :node AND hash = :hash
-                    """, {"count": re[0]+node_attr[node][h], "node": node, "hash": h})
+                    """, {"count": re[0][0]+node_attr[node][h], "node": node, "hash": h})
 
 
 class Statistic(object):
@@ -92,12 +93,44 @@ class Statistic(object):
         
     def query_traces_bytime(self, from_time, to_time):
         if from_time == None:
-            return self.raw.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces limit 100000")
+            return self.raw.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces")
         else:
             return self.raw.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,trace_address from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
 
     def query_subtraces_count_bytx(self, transaction_hash):
         return self.raw.cur.execute("select count(*) from subtraces indexed by subtraces_transaction_hash_index where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+
+    def query_txs_for_analysis(self):
+        return self.db.cur.execute("select * from transactions")
+
+    def query_hash_count_on_node(self, tx, node, trace_hash, from_time, to_time):
+        count = 0
+        date = from_time.date()
+        while date <= to_time.date():
+            database = StatisticDatabase(f"{self.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
+            re = database.cur.execute("select count from nodes where node_address = :node and hash = :hash", {"node": node, "hash": trace_hash}).fetchall()
+            if len(re) > 0:
+                count += re[0][0]
+            date += relativedelta(months=1)
+        return count
+
+    def query_max_count_on_node(self, node, from_time, to_time):
+        node_hashes = {}
+        date = from_time.date()
+        while date <= to_time.date():
+            database = StatisticDatabase(f"{self.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
+            re = database.cur.execute("select hash, count from nodes where node_address = :node", {"node": node}).fetchall()
+            for one in re:
+                if one[0] in node_hashes:
+                    node_hashes[one[0]] += one[1]
+                else:
+                    node_hashes[one[0]] = one[1]
+            date += relativedelta(months=1)
+        max_count = 0 
+        for h in node_hashes:
+            if node_hashes[h] > max_count:
+                max_count = node_hashes[h]
+        return max_count
 
     def hash_subtraces(self, subtraces):
         subtraces.sort(key=sort_by_trace_address)
@@ -208,7 +241,7 @@ class Statistic(object):
 
         return (tx_attr, node_attr, hash2tx)
 
-    def analyze(self, tx_attr, node_attr, hash2tx, tx2hash):
+    def analyze(self, tx_attr, node_attr, tx2hash):
         max_hash = {}
         for node_addr in node_attr:
             max_count = 0
@@ -224,6 +257,65 @@ class Statistic(object):
                 tx_attr[tx][node_addr] = max_hash[node_addr]/node_attr[node_addr][h]
 
         import IPython;IPython.embed()
+
+    def analyze_txs(self, from_time, to_time):
+        print("Analyze txs from", month_to_str(from_time.date()), "to", month_to_str(to_time.date()))
+        fun = {}
+        max_hash = {}
+        date = from_time.date()
+        while date <= to_time.date():
+            self.db = StatisticDatabase(f"{self.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
+            txs = self.query_txs_for_analysis().fetchall()
+            print(month_to_str(date), len(txs), "transsactions")
+            count = 0
+            for tx in txs:
+                tx_hash = tx[0]
+                nodes_address = eval(tx[1])
+                trace_hash = tx[2]
+                tx_attr = {}
+                for node in nodes_address:
+                    if node == None:
+                        continue
+                    hash_count = self.query_hash_count_on_node(tx_hash, node, trace_hash, from_time, to_time)
+                    if node not in max_hash:
+                        max_hash[node] = self.query_max_count_on_node(node, from_time, to_time)
+                    tx_attr[node] = max_hash[node]/hash_count
+                if self.isfun(tx_attr):
+                    fun[tx_hash] = tx_attr
+
+                count += 1
+                sys.stdout.write(str(count) + '\r')
+                sys.stdout.flush()
+            del txs
+            gc.collect()
+            date += relativedelta(months=1)
+        return fun
+
+    def isfun(self, tx_attr):
+        for h in tx_attr:
+            if tx_attr[h] > 10:
+                retufrn True
+        return False
+
+    def process_raw_data(self, from_time, to_time):
+        print("Process data from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
+        date = from_time.date()
+        while date <= to_time.date():
+            print(date_to_str(date))
+            self.raw = EthereumDatabase(f"{self.db_path}/raw/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+            self.db = StatisticDatabase(f"{self.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
+            try:
+                self.db.database_create()
+            except:
+                print("datebase already exists")
+            trace_graph = self.build_trace_graph()
+            (tx_attr, node_attr, hash2tx) = self.extract_from_graph(trace_graph)
+            self.db.database_insert(tx_attr, node_attr, hash2tx)
+            self.db.database_commit()
+            print("statistic data inserted:", len(tx_attr.keys()), "transcations,", len(node_attr.keys()), "nodes,", len(hash2tx.keys()), "hashes")
+            del trace_graph, tx_attr, node_attr, hash2tx
+            gc.collect()
+            date += timedelta(days=1)
         
 
 def main(argv):
@@ -231,32 +323,10 @@ def main(argv):
     date = from_time.date()
     analyzer = Statistic(date, DB_PATH)
 
-    # print("Statistic analysis on", date_to_str(date))
-    # trace_graph = analyzer.build_trace_graph()
-    # (tx_attr, node_attr, hash2tx) = analyzer.extract_from_graph(trace_graph)
-
     to_time = datetime(2018, 10, 7, 0, 0, 0)
-    print("Extract data from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
-    date = from_time.date()
-    while date <= to_time.date():
-        print(date_to_str(date))
-        analyzer.raw = EthereumDatabase(f"{analyzer.db_path}/raw/bigquery_ethereum_{date_to_str(date)}.sqlite3")
-        analyzer.db = StatisticDatabase(f"{analyzer.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
-        try:
-            analyzer.db.database_create()
-        except:
-            print("datebase already exists")
-        trace_graph = analyzer.build_trace_graph()
-        (tx_attr, node_attr, hash2tx) = analyzer.extract_from_graph(trace_graph)
-        analyzer.db.database_insert(tx_attr, node_attr, hash2tx)
-        analyzer.db.database_commit()
-        print("statistic data inserted:", len(tx_attr.keys()), "transcations,", len(node_attr.keys()), "nodes,", len(hash2tx.keys()), "hashes")
-        del trace_graph, tx_attr, node_attr, hash2tx
-        gc.collect()
-        date += timedelta(days=1)
+    # analyzer.process_raw_data(from_time, to_time)
+    fun = analyzer.analyze_txs(from_time, to_time)
 
-    # print("Statistic analysis from", date_to_str(from_time.date()), "to", date_to_str(to_time.date()))
-    # trace_graph = analyzer.build_trace_graph_on_multidb(from_time, to_time)
     import IPython;IPython.embed()
 
 if __name__ == "__main__":
