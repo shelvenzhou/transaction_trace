@@ -55,7 +55,7 @@ class StatisticDatabase(object):
     def database_commit(self):
         self.conn.commit()
 
-    def database_insert(self, tx_attr, node_attr, hash2tx):
+    def database_insert(self, tx_attr, node_attr, tx2hash):
         for tx in tx_attr:
             nodes_address = list(tx_attr[tx].keys())
             self.cur.execute("""
@@ -63,11 +63,10 @@ class StatisticDatabase(object):
                 VALUES(?, ?);
             """, (tx, str(nodes_address)))
 
-        for h in hash2tx:
-            for tx in hash2tx[h]:
-                self.cur.execute("""
-                    UPDATE transactions SET trace_hash = :trace_hash WHERE transaction_hash = :tx_hash
-                """, {"trace_hash": h, "tx_hash": tx})
+        for tx in tx2hash:
+            self.cur.execute("""
+                UPDATE transactions SET trace_hash = :trace_hash WHERE transaction_hash = :tx_hash
+            """, {"trace_hash": tx2hash[tx], "tx_hash": tx})
 
         for node in node_attr:
             for h in node_attr[node]:
@@ -103,6 +102,22 @@ class Statistic(object):
     def query_txs_for_analysis(self):
         return self.db.cur.execute("select * from transactions")
 
+    def query_nodes_for_analysis(self, from_time, to_time):
+        nodes = {}
+        date = from_time.date()
+        while date <= to_time.date():
+            database = StatisticDatabase(f"{self.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
+            re = database.cur.execute("select * from nodes").fetchall()
+            for one in re:
+                if one[0] not in nodes:
+                    nodes[one[0]] = {}
+                if one[1] not in nodes[one[0]]:
+                    nodes[one[0]][one[1]] = one[2]
+                else:
+                    nodes[one[0]][one[1]] += one[2]
+            date += relativedelta(months=1)
+        return nodes
+
     def query_hash_count_on_node(self, tx, node, trace_hash, from_time, to_time):
         count = 0
         date = from_time.date()
@@ -119,7 +134,7 @@ class Statistic(object):
         date = from_time.date()
         while date <= to_time.date():
             database = StatisticDatabase(f"{self.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
-            re = database.cur.execute("select hash, count from nodes where node_address = :node", {"node": node}).fetchall()
+            re = database.cur.execute("select hash, count from nodes indexed by node_address_index where node_address = :node", {"node": node}).fetchall()
             for one in re:
                 if one[0] in node_hashes:
                     node_hashes[one[0]] += one[1]
@@ -150,14 +165,15 @@ class Statistic(object):
         m = hashlib.sha256(str(symbolic_subtraces).encode('utf-8'))
         return '0x' + m.hexdigest()
 
-    def build_trace_graph(self, graph=None, from_time=None, to_time=None):
+    def build_trace_graph(self, graph=None, tx2hash=None, from_time=None, to_time=None):
         if graph == None:
             trace_graph = nx.DiGraph()
         else:
             trace_graph = graph
+        if tx2hash == None:
+            tx2hash = {}
         traces = self.query_traces_bytime(from_time, to_time).fetchall()
         print(len(traces), "traces")
-        tx2hash = {}
         count = 0
         for trace in traces:
             tx_hash = trace['transaction_hash']
@@ -202,22 +218,22 @@ class Statistic(object):
             sys.stdout.flush()
 
         print(len(tx2hash.keys()), "transactions")
-        return trace_graph
+        return (trace_graph, tx2hash)
 
     def build_trace_graph_on_multidb(self, from_time, to_time):
         date = from_time.date()
         trace_graph = nx.DiGraph()
+        tx2hash = {}
         while date <= to_time.date():
             print(date_to_str(date))
             self.raw = EthereumDatabase(f"{self.db_path}/raw/bigquery_ethereum_{date_to_str(date)}.sqlite3")
-            trace_graph = self.build_trace_graph(graph=trace_graph)
+            (trace_graph, tx2hash) = self.build_trace_graph(graph=trace_graph, tx2hash=tx2hash)
             date += timedelta(days=1)
-        return trace_graph
+        return (trace_graph, tx2hash)
 
     def extract_from_graph(self, trace_graph):
         tx_attr = {}
         node_attr = {}
-        hash2tx = {}
         nodes = trace_graph.nodes(data=True)
         for node in nodes:
             node_addr = node[0]
@@ -231,34 +247,53 @@ class Statistic(object):
                     node_attr[node_addr][h] = hash_count[h]
                 else:
                     node_attr[node_addr][h] += hash_count[h]
-                if h not in hash2tx:
-                    hash2tx[h] = []
                 for tx in node[1][h]:
                     if tx not in tx_attr:
                         tx_attr[tx] = {}
                     tx_attr[tx][node_addr] = None
-                    hash2tx[h].append(tx)
 
-        return (tx_attr, node_attr, hash2tx)
+        return (tx_attr, node_attr)
 
-    def analyze(self, tx_attr, node_attr, tx2hash):
+    def analyze(self, from_time, to_time):
+        print("Analyze txs from", month_to_str(from_time.date()), "to", month_to_str(to_time.date()))
+        nodes = self.query_nodes_for_analysis(from_time, to_time)
         max_hash = {}
-        for node_addr in node_attr:
+        for node_addr in nodes:
             max_count = 0
-            for h in node_attr[node_addr]:
-                if node_attr[node_addr][h] > max_count:
-                    max_count = node_attr[node_addr][h]
+            for h in nodes[node_addr]:
+                if nodes[node_addr][h] > max_count:
+                    max_count = nodes[node_addr][h]
             max_hash[node_addr] = max_count
         
-        for tx in tx_attr:
-            for node_addr in tx_attr[tx]:
-                h = tx2hash[tx]
-                import IPython;IPython.embed()
-                tx_attr[tx][node_addr] = max_hash[node_addr]/node_attr[node_addr][h]
+        fun = {}
+        date = from_time.date()
+        while date <= to_time.date():
+            self.db = StatisticDatabase(f"{self.db_path}/statistic/statistic_{month_to_str(date)}.sqlite3")
+            txs = self.query_txs_for_analysis().fetchall()
+            print(month_to_str(date), len(txs), "transsactions")
+            count = 0
+            for tx in txs:
+                tx_hash = tx[0]
+                nodes_address = eval(tx[1])
+                trace_hash = tx[2]
+                tx_attr = {}
+                for node in nodes_address:
+                    if node == None:
+                        continue
+                    tx_attr[node] = max_hash[node]/nodes[node][trace_hash]
+                if self.isfun(tx_attr):
+                    fun[tx_hash] = tx_attr
 
-        import IPython;IPython.embed()
+                count += 1
+                sys.stdout.write(str(count) + '\r')
+                sys.stdout.flush()
+            del txs
+            gc.collect()
+            date += relativedelta(months=1)
 
-    def analyze_txs(self, from_time, to_time):
+        return fun
+
+    def analyze_txs_when_poor(self, from_time, to_time):
         print("Analyze txs from", month_to_str(from_time.date()), "to", month_to_str(to_time.date()))
         fun = {}
         max_hash = {}
@@ -294,7 +329,7 @@ class Statistic(object):
     def isfun(self, tx_attr):
         for h in tx_attr:
             if tx_attr[h] > 10:
-                retufrn True
+                return True
         return False
 
     def process_raw_data(self, from_time, to_time):
@@ -308,12 +343,12 @@ class Statistic(object):
                 self.db.database_create()
             except:
                 print("datebase already exists")
-            trace_graph = self.build_trace_graph()
-            (tx_attr, node_attr, hash2tx) = self.extract_from_graph(trace_graph)
-            self.db.database_insert(tx_attr, node_attr, hash2tx)
+            (trace_graph, tx2hash) = self.build_trace_graph()
+            (tx_attr, node_attr) = self.extract_from_graph(trace_graph)
+            self.db.database_insert(tx_attr, node_attr, tx2hash)
             self.db.database_commit()
-            print("statistic data inserted:", len(tx_attr.keys()), "transcations,", len(node_attr.keys()), "nodes,", len(hash2tx.keys()), "hashes")
-            del trace_graph, tx_attr, node_attr, hash2tx
+            print("statistic data inserted:", len(tx_attr.keys()), "transcations,", len(node_attr.keys()), "nodes")
+            del trace_graph, tx_attr, node_attr, tx2hash
             gc.collect()
             date += timedelta(days=1)
         
@@ -325,7 +360,11 @@ def main(argv):
 
     to_time = datetime(2018, 10, 7, 0, 0, 0)
     # analyzer.process_raw_data(from_time, to_time)
-    fun = analyzer.analyze_txs(from_time, to_time)
+    fun = analyzer.analyze(from_time, to_time)
+
+    # (trace_graph, tx2hash) = analyzer.build_trace_graph_on_multidb(from_time, to_time)
+    # (tx_attr, node_attr) = analyzer.extract_from_graph(trace_graph)
+    # fun = analyzer.analyze(tx_attr, node_attr, tx2hash)
 
     import IPython;IPython.embed()
 
