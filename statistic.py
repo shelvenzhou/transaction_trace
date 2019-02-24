@@ -265,6 +265,7 @@ class Statistic(object):
                     max_count = nodes[node_addr][h]
             max_hash[node_addr] = max_count
         
+        mix = []
         fun = {}
         date = from_time.date()
         while date <= to_time.date():
@@ -277,6 +278,11 @@ class Statistic(object):
                 nodes_address = eval(tx[1])
                 trace_hash = tx[2]
                 tx_attr = {}
+                mix_hash = hashlib.sha256((tx[2] + tx[1]).encode('utf-8')).hexdigest()
+                if mix_hash in mix:
+                    continue
+                else:
+                    mix.append(mix_hash)
                 for node in nodes_address:
                     if node == None:
                         continue
@@ -291,7 +297,7 @@ class Statistic(object):
             gc.collect()
             date += relativedelta(months=1)
 
-        return fun
+        return (fun, nodes)
 
     def analyze_txs_when_poor(self, from_time, to_time):
         print("Analyze txs from", month_to_str(from_time.date()), "to", month_to_str(to_time.date()))
@@ -328,7 +334,7 @@ class Statistic(object):
 
     def isfun(self, tx_attr):
         for h in tx_attr:
-            if tx_attr[h] > 10:
+            if tx_attr[h] > 30:
                 return True
         return False
 
@@ -360,7 +366,7 @@ def main(argv):
 
     to_time = datetime(2018, 10, 7, 0, 0, 0)
     # analyzer.process_raw_data(from_time, to_time)
-    fun = analyzer.analyze(from_time, to_time)
+    (fun, nodes) = analyzer.analyze(from_time, to_time)
 
     # (trace_graph, tx2hash) = analyzer.build_trace_graph_on_multidb(from_time, to_time)
     # (tx_attr, node_attr) = analyzer.extract_from_graph(trace_graph)
