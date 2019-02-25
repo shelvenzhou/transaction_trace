@@ -1,11 +1,12 @@
 import networkx as nx
 from local.ethereum_database import EthereumDatabase
 from datetime_utils import time_to_str
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 import sys
 
 DB_FILEPATH = "/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3"
 SUBTRACE_ANALYSIS_FILEPATH = "logs/subtrace_analysis"
+
 
 class DiGraphBuilder(object):
     def __init__(self, db_filepath=DB_FILEPATH):
@@ -15,19 +16,19 @@ class DiGraphBuilder(object):
         return self.local.cur.execute("select * from subtraces")
 
     def query_trace_byid(self, traceid):
-        return self.local.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,gas_used from traces where rowid = :trace_id", {'trace_id':traceid})
+        return self.local.cur.execute("select transaction_hash,from_address,to_address,input,trace_type,gas_used from traces where rowid = :trace_id", {'trace_id': traceid})
 
     def query_traces_bytime(self, from_time, to_time):
-        return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+        return self.local.cur.execute("select rowid,transaction_hash,from_address,to_address,input from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time": from_time, "to_time": to_time})
 
     def query_subtraces_bytx(self, transaction_hash):
-        return self.local.cur.execute("select * from subtraces where transaction_hash = :tx_hash", {'tx_hash':transaction_hash})
+        return self.local.cur.execute("select * from subtraces where transaction_hash = :tx_hash", {'tx_hash': transaction_hash})
 
     def query_txs_bytime(self, from_time, to_time):
-        return self.local.cur.execute("select distinct transaction_hash from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time":from_time, "to_time":to_time})
+        return self.local.cur.execute("select distinct transaction_hash from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time": from_time, "to_time": to_time})
 
     def build_digraph_on_traces(self, from_time, to_time):
-        
+
         trace_dg = nx.DiGraph()
         traces = self.query_traces_bytime(from_time, to_time)
         for trace in traces:
@@ -42,7 +43,7 @@ class DiGraphBuilder(object):
             else:
                 trace_dg[from_address][to_address][method_hash] = {}
                 method_attr = trace_dg[from_address][to_address][method_hash]
-            
+
             if tx_hash in method_attr.keys():
                 method_attr[tx_hash] += 1
             else:
@@ -57,7 +58,8 @@ class DiGraphBuilder(object):
         print(f"{len(txs)} transactions")
         tx_count = 0
         for tx in txs:
-            trace_graph = self.build_digraph_on_subtraces_bytx(tx['transaction_hash'])
+            trace_graph = self.build_digraph_on_subtraces_bytx(
+                tx['transaction_hash'])
             if trace_graph == None:
                 continue
             subtrace_graphs.append(trace_graph)
@@ -89,11 +91,13 @@ class DiGraphBuilder(object):
                 trace_dg[from_address][to_address]['gas_used'] = []
 
             trace_dg[from_address][to_address]['id'].append(trace_id)
-            trace_dg[from_address][to_address]['parent_trace_id'].append(parent_trace_id)
+            trace_dg[from_address][to_address]['parent_trace_id'].append(
+                parent_trace_id)
             trace_dg[from_address][to_address]['trace_type'].append(trace_type)
             trace_dg[from_address][to_address]['gas_used'].append(gas_used)
 
         return trace_dg
+
 
 class GraphAnalyzer(object):
     def __init__(self, db):
@@ -104,7 +108,7 @@ class GraphAnalyzer(object):
         file.write(msg + "\n")
 
     def query_input_byid(self, traceid):
-        return self.local.cur.execute("select input from traces where rowid = :trace_id", {'trace_id':traceid})
+        return self.local.cur.execute("select input from traces where rowid = :trace_id", {'trace_id': traceid})
 
     def analyze_subtraces(self, subtrace_graph):
         fun = False
@@ -143,8 +147,9 @@ class GraphAnalyzer(object):
                     gas_used = data['gas_used'][index]
                     if parent_trace_id == None or gas_used == None:
                         continue
-                    trace_input = self.query_input_byid(id).fetchone()['input']          
-                    parent_trace_input = self.query_input_byid(parent_trace_id).fetchone()['input']
+                    trace_input = self.query_input_byid(id).fetchone()['input']
+                    parent_trace_input = self.query_input_byid(
+                        parent_trace_id).fetchone()['input']
                     if len(trace_input) > 10 and len(parent_trace_input) > 10 and gas_used > 0:
                         method_hash = trace_input[2:10]
                         if method_hash in parent_trace_input:
@@ -154,7 +159,9 @@ class GraphAnalyzer(object):
                             self.print_and_write(f, m)
                             m = cycle[0]
                             self.print_and_write(f, m)
-                            m = "trace id: " + str(id) + " parent trace id: " + str(parent_trace_id)
+                            m = "trace id: " + \
+                                str(id) + " parent trace id: " + \
+                                str(parent_trace_id)
                             self.print_and_write(f, m)
                             m = "--------------------"
                             self.print_and_write(f, m)
@@ -187,7 +194,7 @@ class GraphAnalyzer(object):
                     m = "--------------------"
                     self.print_and_write(f, m)
                     f.close()
-        
+
         return reentrancy
 
     def check_reentrancy_bycycle(self, graph, cycle):
@@ -202,7 +209,8 @@ class GraphAnalyzer(object):
                 parent_id = []
                 for id in trace_id:
                     if id in data['id']:
-                        parent_id.append(data['parent_trace_id'][data['id'].index(id)])
+                        parent_id.append(
+                            data['parent_trace_id'][data['id'].index(id)])
                 trace_id = parent_id
                 if len(trace_id) == 0:
                     break
@@ -228,7 +236,8 @@ def main():
     to_time = datetime(2018, 12, 25, 0, 0, 0)
     # to_time = from_time + timedelta(hours=1)
     while from_time < datetime(2018, 12, 25, 0, 0, 0):
-        print("building subtrace graphs from", time_to_str(from_time), "to", time_to_str(to_time))
+        print("building subtrace graphs from", time_to_str(
+            from_time), "to", time_to_str(to_time))
         graphs = builder.build_digraph_on_subtraces_bytime(from_time, to_time)
         print(f"analyzing {len(graphs)} graphs...")
         fun = False
@@ -244,12 +253,9 @@ def main():
         from_time = to_time
         to_time = from_time + timedelta(hours=1)
 
-    import IPython;IPython.embed()
+    import IPython
+    IPython.embed()
 
 
 if __name__ == "__main__":
     main()
-
-
-    
-    

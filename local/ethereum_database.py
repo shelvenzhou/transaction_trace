@@ -16,6 +16,7 @@ def adapt_decimal(d):
 def convert_decimal(s):
     return decimal.Decimal(s)
 
+
 def tz_aware_timestamp_adapter(val):
     datepart, timepart = val.split(b" ")
     year, month, day = map(int, datepart.split(b"-"))
@@ -26,7 +27,8 @@ def tz_aware_timestamp_adapter(val):
             tzinfo = datetime.timezone.utc
         else:
             hours, minutes = map(int, tz_offset.split(b':', 1))
-            tzinfo = datetime.timezone(datetime.timedelta(hours=hours, minutes=minutes))
+            tzinfo = datetime.timezone(
+                datetime.timedelta(hours=hours, minutes=minutes))
     else:
         tzinfo = None
 
@@ -38,9 +40,11 @@ def tz_aware_timestamp_adapter(val):
     else:
         microseconds = 0
 
-    val = datetime.datetime(year, month, day, hours, minutes, seconds, microseconds, tzinfo)
+    val = datetime.datetime(year, month, day, hours,
+                            minutes, seconds, microseconds, tzinfo)
 
     return val
+
 
 sqlite3.register_converter('timestamp', tz_aware_timestamp_adapter)
 sqlite3.register_adapter(decimal.Decimal, adapt_decimal)
