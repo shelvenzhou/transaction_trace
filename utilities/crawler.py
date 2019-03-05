@@ -17,7 +17,8 @@ def main():
             from_time = str_to_time(f.readline())
     except:
         from_time = datetime(2017, 9, 29, 23, 0, 0)
-        to_time = from_time + timedelta(hours=1)
+
+    to_time = from_time + timedelta(hours=1)
 
     while True:
         date = from_time.date()
