@@ -17,5 +17,13 @@ def date_to_str(d):
     return d.strftime(DATE_FORMAT)
 
 
+def str_to_date(s):
+    return datetime.strptime(s, DATE_FORMAT)
+
+
 def month_to_str(m):
     return m.strftime(MONTH_FORMAT)
+
+
+def str_to_month(s):
+    return datetime.strptime(s, MONTH_FORMAT)
