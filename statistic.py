@@ -106,6 +106,7 @@ class Statistic(object):
                 continue
             childs_id = tree[trace_id]
             if len(childs_id) == 1:
+                dfs_stack.append(childs_id[0])
                 back_step[-1] += 1
             else:
                 for child in childs_id:
@@ -123,7 +124,6 @@ class Statistic(object):
         tx2paths = {}
         for tx_hash in tx_trees:
             tx2paths[tx_hash] = self.traversal_with_dfs(tx_trees[tx_hash])
-        del tx_trees
 
         traces = self.raw.read_from_database(
             table="traces",
@@ -171,8 +171,7 @@ class Statistic(object):
             count += 1
             sys.stdout.write(str(count) + '\r')
             sys.stdout.flush()
-
-        del tx2paths, id2trace
+        del tx_trees, tx2paths, id2trace
 
         print("Appending data to graph...")
         count = 0
@@ -323,7 +322,7 @@ class Statistic(object):
                     self.db.update_on_database(
                         table="nodes",
                         assign="count = :count",
-                        clause="WHERE node_address = :node AND hash = :hash",
+                        clause="WHERE node_address = :node AND subtrace_hash = :hash",
                         vals={
                             "count": re[0][0] + node2hashs[node][h],
                             "node": node,
@@ -360,7 +359,7 @@ def main(argv):
     analyzer = Statistic(DB_PATH)
     from_time = datetime(2018, 10, 7, 0, 0, 0)
     to_time = datetime(2018, 10, 7, 0, 0, 0)
-    # analyzer.process_raw_data(from_time, to_time)
+    analyzer.process_raw_data(from_time, to_time)
     (fun, nodes) = analyzer.analyze(from_time, to_time)
 
     import IPython
