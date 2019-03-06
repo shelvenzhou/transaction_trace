@@ -119,21 +119,9 @@ class EthereumDatabase(object):
         self.database_commit()
 
     def database_insert(self, rows):
-        # self.cur.executemany("""
-        #     INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
-        #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        # """, rows)
-
         trace_count = 0
         for row in rows:
-            # import IPython;IPython.embed()
             try:
-                # self.cur.execute(
-                #     """
-                #     INSERT INTO traces(transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash)
-                #     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-                # """, row)
-
                 self.write_into_database(
                     "traces", row,
                     "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
@@ -150,12 +138,6 @@ class EthereumDatabase(object):
         self.conn.commit()
 
     def update_crawl_records(self, from_time, to_time, trace_count):
-        # self.cur.execute(
-        #     """
-        #     INSERT INTO crawl_records(from_time, to_time, trace_count)
-        #     VALUES (?, ?, ?)
-        # """, (from_time, to_time, trace_count))
-
         self.write_into_database("crawl_records",
                                  (from_time, to_time, trace_count), "?, ?, ?",
                                  "from_time, to_time, trace_count")
