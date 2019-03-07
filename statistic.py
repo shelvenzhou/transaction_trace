@@ -194,8 +194,7 @@ class Statistic(object):
                                     subtrace_hash]:
                                 trace_graph.node[addr][subtrace_hash].append(
                                     tx_hash)
-                    nodes.remove(subtraces[0][0])
-                    nodes_list.append(tuple(nodes))
+                    nodes_list.append(list(nodes))
                 tx2hashs[tx_hash][subtrace_hash] = nodes_list
             count += 1
             sys.stdout.write(str(count) + '\r')
@@ -252,17 +251,18 @@ class Statistic(object):
                 if tx_hash in fun:
                     continue
                 for addresses in node_addresses:
+                    mix_hash = subtrace_hash + str(addresses)
+                    if mix_hash in mix:
+                        break
+                    else:
+                        mix.add(mix_hash)
                     node_heat = []
+                    addresses.pop(0)
                     for node_address in addresses:
                         node_heat.append((node_address,
                                           nodes_attr[node_address]["heat"]))
                     node_heat.sort(key=lambda one: one[1], reverse=True)
                     tx_attr = {}
-                    mix_hash = tx_hash + subtrace_hash
-                    if mix_hash in mix:
-                        break
-                    else:
-                        mix.add(mix_hash)
                     for node in node_heat:
                         node_address = node[0]
                         if node_address == None:
@@ -365,7 +365,7 @@ def main(argv):
     analyzer = Statistic(DB_PATH)
     from_time = datetime(2018, 10, 7, 0, 0, 0)
     to_time = datetime(2018, 10, 7, 0, 0, 0)
-    # analyzer.process_raw_data(from_time, to_time)
+    analyzer.process_raw_data(from_time, to_time)
     (fun, nodes) = analyzer.analyze(from_time, to_time)
 
     import IPython
