@@ -194,6 +194,7 @@ class Statistic(object):
                                     subtrace_hash]:
                                 trace_graph.node[addr][subtrace_hash].append(
                                     tx_hash)
+                    nodes.remove(subtraces[0][0])
                     nodes_list.append(tuple(nodes))
                 tx2hashs[tx_hash][subtrace_hash] = nodes_list
             count += 1
@@ -275,7 +276,7 @@ class Statistic(object):
                 count += 1
                 sys.stdout.write(str(count) + '\r')
                 sys.stdout.flush()
-            print(count, "transactions")
+
             del txs, mix
             gc.collect()
             date += relativedelta(months=1)
@@ -284,9 +285,13 @@ class Statistic(object):
 
     def isfun(self, tx_attr):
         heat_point = 0.2
+        heat_top = 500
+        heat_floor = 10
         rare_point = 20
 
         node_addrs = list(tx_attr.keys())
+        if tx_attr[node_addrs[0]] < heat_top or tx_attr[node_addrs[-1]] > heat_floor:
+            return False
         for node_addr in node_addrs[:int(len(node_addrs) * heat_point) + 1]:
             if tx_attr[node_addr] > rare_point:
                 return True
@@ -322,7 +327,8 @@ class Statistic(object):
                     self.db.update_on_database(
                         table="nodes",
                         assign="count = :count",
-                        clause="WHERE node_address = :node AND subtrace_hash = :hash",
+                        clause=
+                        "WHERE node_address = :node AND subtrace_hash = :hash",
                         vals={
                             "count": re[0][0] + node2hashs[node][h],
                             "node": node,
@@ -359,7 +365,7 @@ def main(argv):
     analyzer = Statistic(DB_PATH)
     from_time = datetime(2018, 10, 7, 0, 0, 0)
     to_time = datetime(2018, 10, 7, 0, 0, 0)
-    analyzer.process_raw_data(from_time, to_time)
+    # analyzer.process_raw_data(from_time, to_time)
     (fun, nodes) = analyzer.analyze(from_time, to_time)
 
     import IPython
