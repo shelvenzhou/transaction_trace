@@ -8,7 +8,7 @@ DB_FILEPATH = "/Users/Still/Desktop/w/db/bigquery_ethereum-t.sqlite3"
 SUBTRACE_ANALYSIS_FILEPATH = "logs/subtrace_analysis"
 
 
-class DiGraphBuilder(object):
+class DiGraphBuilder:
     def __init__(self, db_filepath=DB_FILEPATH):
         self.local = EthereumDatabase(db_filepath)
 
@@ -99,7 +99,7 @@ class DiGraphBuilder(object):
         return trace_dg
 
 
-class GraphAnalyzer(object):
+class GraphAnalyzer:
     def __init__(self, db):
         self.local = db
 

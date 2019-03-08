@@ -186,7 +186,7 @@ def db_filename(date):
     return "bigquery_ethereum_%s.sqlite3" % date
 
 
-class EthereumDatabase(object):
+class EthereumDatabase:
 
     def __init__(self, db_folder):
         self._db_folder = db_folder

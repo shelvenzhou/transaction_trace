@@ -6,7 +6,7 @@ import decimal
 import sys
 
 
-class SubTrace(object):
+class SubTrace:
 
     def __init__(self, txhash=None, id=None, level=None, seq=None, parent_level=None, parent_seq=None):
         self.txhash = txhash
@@ -21,7 +21,7 @@ class SubTrace(object):
         self.parent_id = parent_id
 
 
-class SubTraceBuilder(object):
+class SubTraceBuilder:
 
     def __init__(self):
         self.local = None

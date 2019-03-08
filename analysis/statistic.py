@@ -18,7 +18,7 @@ def sort_by_trace_address(subtrace):
     return subtrace[3]
 
 
-class StatisticDatabase(object):
+class StatisticDatabase:
 
     def __init__(self, db_filepath):
         self.db_filepath = db_filepath
@@ -88,7 +88,7 @@ class StatisticDatabase(object):
                     """, {"count": re[0][0]+node_attr[node][h], "node": node, "hash": h})
 
 
-class Statistic(object):
+class Statistic:
     def __init__(self, db_date, db_path=DB_PATH):
         self.db_path = db_path
         self.raw = EthereumDatabase(
