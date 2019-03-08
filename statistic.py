@@ -27,12 +27,17 @@ class Statistic(object):
             f"{self.db_path}/statistic/statistic_{month_to_str(db_date)}.sqlite3"
         )
 
-    def get_nodes_bytime(self, from_time, to_time):
+    def get_nodes_by_time(self, from_time=None, to_time=None):
         nodes = {}
         nodes_attr = {}
-        date = from_time.date()
+        if from_time == None:
+            to_time = datetime.now()
+            date = to_time.date()
+        else:
+            date = from_time.date()
         while date <= to_time.date():
-            self.load_database(date)
+            if from_time != None:
+                self.load_database(date)
             result = self.db.read_from_database(table="nodes", columns="*")
             for one in result:
                 node_address = one[0]
@@ -40,15 +45,17 @@ class Statistic(object):
                 count = one[2]
                 if node_address not in nodes:
                     nodes[node_address] = {}
-                    nodes_attr[node_address] = {"heat": 0, "max": 0}
+                    if from_time != None:
+                        nodes_attr[node_address] = {"heat": 0, "max": 0}
                 if subtrace_hash not in nodes[node_address]:
                     count_new = count
                 else:
                     count_new = nodes[node_address][subtrace_hash] + count
                 nodes[node_address][subtrace_hash] = count_new
-                nodes_attr[node_address]["heat"] += count
-                if count_new > nodes_attr[node_address]["max"]:
-                    nodes_attr[node_address]["max"] = count_new
+                if from_time != None:
+                    nodes_attr[node_address]["heat"] += count
+                    if count_new > nodes_attr[node_address]["max"]:
+                        nodes_attr[node_address]["max"] = count_new
             date += relativedelta(months=1)
         return (nodes, nodes_attr)
 
@@ -234,7 +241,8 @@ class Statistic(object):
     def analyze(self, from_time, to_time):
         print("Analyze txs from", month_to_str(from_time.date()), "to",
               month_to_str(to_time.date()))
-        (nodes, nodes_attr) = self.get_nodes_bytime(from_time, to_time)
+        print("loading nodes from database...")
+        (nodes, nodes_attr) = self.get_nodes_by_time(from_time, to_time)
 
         mix = set()
         fun = {}
@@ -277,20 +285,22 @@ class Statistic(object):
                 sys.stdout.write(str(count) + '\r')
                 sys.stdout.flush()
 
-            del txs, mix
-            gc.collect()
+            print(count, "transactions")
             date += relativedelta(months=1)
 
         return (fun, nodes)
 
     def isfun(self, tx_attr):
         heat_point = 0.2
-        heat_top = 500
-        heat_floor = 10
+        heat_top = 60
+        heat_floor = 15
         rare_point = 20
 
+        if len(tx_attr) == 0:
+            return False
         node_addrs = list(tx_attr.keys())
-        if tx_attr[node_addrs[0]] < heat_top or tx_attr[node_addrs[-1]] > heat_floor:
+        if tx_attr[node_addrs[0]] < heat_top or tx_attr[
+                node_addrs[-1]] > heat_floor:
             return False
         for node_addr in node_addrs[:int(len(node_addrs) * heat_point) + 1]:
             if tx_attr[node_addr] > rare_point:
@@ -298,6 +308,7 @@ class Statistic(object):
         return False
 
     def database_insert(self, tx2hashs, node2hashs):
+        count = 0
         for tx_hash in tx2hashs:
             for h in tx2hashs[tx_hash]:
                 self.db.write_into_database(
@@ -305,19 +316,17 @@ class Statistic(object):
                     vals=(tx_hash, h, str(tx2hashs[tx_hash][h])),
                     placeholder="?, ?, ?",
                     columns="transaction_hash, subtrace_hash, node_addresses")
+            count += 1
+            sys.stdout.write(str(count) + '\r')
+            sys.stdout.flush()
 
+        print(len(node2hashs), "nodes")
+
+        nodes = self.get_nodes_by_time()[0]
+        count = 0
         for node in node2hashs:
             for h in node2hashs[node]:
-                re = self.db.read_from_database(
-                    table="nodes",
-                    columns="count",
-                    clause=
-                    "WHERE node_address = :node AND subtrace_hash = :hash",
-                    vals={
-                        "node": node,
-                        "hash": h
-                    }).fetchall()
-                if len(re) == 0:
+                if h not in nodes[node]:
                     self.db.write_into_database(
                         table="nodes",
                         vals=(node, h, node2hashs[node][h]),
@@ -330,10 +339,13 @@ class Statistic(object):
                         clause=
                         "WHERE node_address = :node AND subtrace_hash = :hash",
                         vals={
-                            "count": re[0][0] + node2hashs[node][h],
+                            "count": nodes[node][h] + node2hashs[node][h],
                             "node": node,
                             "hash": h
                         })
+            count += 1
+            sys.stdout.write(str(count) + '\r')
+            sys.stdout.flush()
 
     def process_raw_data(self, from_time, to_time):
         print("Process data from", date_to_str(from_time.date()), "to",
@@ -348,6 +360,7 @@ class Statistic(object):
                 print("datebase already exists")
             (trace_graph, tx2hashs) = self.build_trace_graph()
             node2hashs = self.extract_from_graph(trace_graph)
+            print("inserting data...")
             self.database_insert(tx2hashs, node2hashs)
             self.db.database_commit()
             print("statistic data inserted:", len(tx2hashs.keys()),
@@ -366,7 +379,7 @@ def main(argv):
     from_time = datetime(2018, 10, 7, 0, 0, 0)
     to_time = datetime(2018, 10, 7, 0, 0, 0)
     analyzer.process_raw_data(from_time, to_time)
-    (fun, nodes) = analyzer.analyze(from_time, to_time)
+    # (fun, nodes) = analyzer.analyze(from_time, to_time)
 
     import IPython
     IPython.embed()
