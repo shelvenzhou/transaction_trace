@@ -186,13 +186,15 @@ class Statistic(object):
             for subtrace_hash in tx2hashs[tx_hash]:
                 nodes_list = []
                 for ssubtraces in tx2hashs[tx_hash][subtrace_hash]:
-                    nodes = set()
+                    nodes = []
                     subtraces = eval(ssubtraces)
                     for subtrace in subtraces:
                         from_address = subtrace[0]
                         to_address = subtrace[1]
-                        nodes.add(from_address)
-                        nodes.add(to_address)
+                        if from_address not in nodes:
+                            nodes.append(from_address)
+                        if to_address not in nodes:
+                            nodes.append(to_address)
                         trace_graph.add_edge(from_address, to_address)
                         for addr in (from_address, to_address):
                             if subtrace_hash not in trace_graph.node[addr]:
@@ -201,7 +203,7 @@ class Statistic(object):
                                     subtrace_hash]:
                                 trace_graph.node[addr][subtrace_hash].append(
                                     tx_hash)
-                    nodes_list.append(list(nodes))
+                    nodes_list.append(nodes)
                 tx2hashs[tx_hash][subtrace_hash] = nodes_list
             count += 1
             sys.stdout.write(str(count) + '\r')
@@ -326,13 +328,11 @@ class Statistic(object):
         count = 0
         for node in node2hashs:
             for h in node2hashs[node]:
-                if h not in nodes[node]:
-                    self.db.write_into_database(
-                        table="nodes",
-                        vals=(node, h, node2hashs[node][h]),
-                        placeholder="?, ?, ?",
-                        columns="node_address, subtrace_hash, count")
-                else:
+                update = False
+                if node in nodes:
+                    if h in nodes[node]:
+                        update = True
+                if update:
                     self.db.update_on_database(
                         table="nodes",
                         assign="count = :count",
@@ -343,6 +343,12 @@ class Statistic(object):
                             "node": node,
                             "hash": h
                         })
+                else:
+                    self.db.write_into_database(
+                        table="nodes",
+                        vals=(node, h, node2hashs[node][h]),
+                        placeholder="?, ?, ?",
+                        columns="node_address, subtrace_hash, count")
             count += 1
             sys.stdout.write(str(count) + '\r')
             sys.stdout.flush()
