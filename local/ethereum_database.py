@@ -208,7 +208,8 @@ class EthereumDatabase:
             to_time = date_to_str(to_time)
 
         for i in range(self._data_time_ranges.bisect_left(from_time), self._data_time_ranges.bisect_right(to_time)):
-            db_filepath = os.path.join(self._db_folder, db_filename(self._data_time_ranges[i]))
+            db_filepath = os.path.join(
+                self._db_folder, db_filename(self._data_time_ranges[i]))
             l.info("read from %s", db_filepath)
 
             db = SingleDatabase(db_filepath)

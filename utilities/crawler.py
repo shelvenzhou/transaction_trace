@@ -1,12 +1,14 @@
-from datetime import datetime,timedelta
 import logging
-from remote.ethereum_bigquery import EthereumBigQuery
+from datetime import datetime, timedelta
+
+from datetime_utils import date_to_str, str_to_time, time_to_str
 from local.ethereum_database import EthereumDatabase
-from datetime_utils import str_to_time,time_to_str,date_to_str
+from remote.ethereum_bigquery import EthereumBigQuery
 
 l = logging.getLogger("bigquery-ethereum-crawler")
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
 
 def main():
     remote = EthereumBigQuery()
@@ -22,7 +24,8 @@ def main():
 
     while True:
         date = from_time.date()
-        local = EthereumDatabase(f"/Users/Still/Desktop/w/db/bigquery_ethereum-t_{date_to_str(date)}.sqlite3")
+        local = EthereumDatabase(
+            f"/Users/Still/Desktop/w/db/bigquery_ethereum-t_{date_to_str(date)}.sqlite3")
         try:
             local.database_create()
         except:
@@ -43,6 +46,7 @@ def main():
             from_time = from_time - timedelta(hours=1)
             with open("logs/crawl-time", "w+") as f:
                 f.write(time_to_str(from_time))
+
 
 if __name__ == "__main__":
     main()
