@@ -52,11 +52,16 @@ sqlite3.register_adapter(decimal.Decimal, adapt_decimal)
 
 class SingleDatabase:
     def __init__(self, db_filepath):
+        self._filepath = db_filepath
+
         conn = sqlite3.connect(
             db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
         conn.row_factory = sqlite3.Row
 
         self._conn = conn
+
+    def __repr__(self):
+        return "connection to %s" % self._filepath
 
     def create_tables(self):
         cur = self._conn.cursor()
@@ -102,7 +107,13 @@ class SingleDatabase:
         cur.execute(
             "CREATE INDEX subtraces_transaction_hash_index ON subtraces(transaction_hash);")
 
-        self._conn.commit()
+    def drop_index(self, index):
+        cur = self._conn.cursor()
+        cur.execute(f"DROP INDEX IF EXISTS {index};")
+
+    def drop_table(self, table):
+        cur = self._conn.cursor()
+        cur.execute(f"DROP TABLE IF EXISTS {table};")
 
     def insert(self, rows, show_progress=False):
         """
@@ -166,12 +177,11 @@ class SingleDatabase:
             'block_hash':           STRING,     REQUIRED
         '''
         cur = self._conn.cursor()
-        cur.execute("SELECT * FROM traces")
-        for row in cur:
+        for row in cur.execute("SELECT * FROM traces"):
             yield row
 
 
-def data_time_ranges(db_folder):
+def data_time_range(db_folder):
     prog = re.compile(r"bigquery_ethereum_(\d{4}\-\d{2}\-\d{2})\.sqlite3")
     dates = SortedList(key=lambda x: str_to_date(x))
     for file in os.listdir(db_folder):
@@ -192,11 +202,34 @@ class EthereumDatabase:
         self._db_folder = db_folder
         self._table_name = "traces"
 
-        self._data_time_ranges = data_time_ranges(db_folder)
+        self._data_time_range = data_time_range(db_folder)
+        self._connection_cache = dict()
+
+    def __repr__(self):
+        return "database manager of %s" % self._db_folder
 
     @property
     def table_name(self):
         return self._table_name
+
+    @property
+    def time_range(self):
+        return self._data_time_range
+
+    def get_connection(self, date):
+        if isinstance(date, datetime.datetime):
+            date = date_to_str(date)
+
+        if date not in self._data_time_range:
+            return None
+
+        if date in self._connection_cache:
+            return self._connection_cache[date]
+
+        db_filepath = os.path.join(self._db_folder, db_filename(date))
+        db = SingleDatabase(db_filepath)
+        self._connection_cache[date] = db
+        return db
 
     def read(self, from_time, to_time):
         '''
@@ -207,11 +240,8 @@ class EthereumDatabase:
         if isinstance(to_time, datetime.datetime):
             to_time = date_to_str(to_time)
 
-        for i in range(self._data_time_ranges.bisect_left(from_time), self._data_time_ranges.bisect_right(to_time)):
-            db_filepath = os.path.join(
-                self._db_folder, db_filename(self._data_time_ranges[i]))
-            l.info("read from %s", db_filepath)
-
-            db = SingleDatabase(db_filepath)
+        for i in range(self._data_time_range.bisect_left(from_time), self._data_time_range.bisect_right(to_time)):
+            date = self._data_time_range[i]
+            db = self.get_connection(date)
             for row in db.read():
                 yield row
