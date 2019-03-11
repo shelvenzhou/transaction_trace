@@ -63,7 +63,10 @@ class SingleDatabase:
     def __repr__(self):
         return "connection to %s" % self._filepath
 
-    def create_tables(self):
+    def commit(self):
+        self._conn.commit()
+
+    def create_traces_table(self):
         cur = self._conn.cursor()
         cur.execute("""
             CREATE TABLE traces(
@@ -88,24 +91,29 @@ class SingleDatabase:
                 block_hash STRING NOT NULL
             );
         """)
+
+    def create_subtraces_table(self):
+        cur = self._conn.cursor()
         cur.execute("""
             CREATE TABLE subtraces(
                 transaction_hash TEXT,
-                id INT PRIMARY KEY,
+                trace_id INT PRIMARY KEY,
                 parent_trace_id INT
             );
         """)
 
-    def create_index(self):
+    def index_traces(self):
         """
         This should ONLY be called after all data is crawled.
         """
         cur = self._conn.cursor()
         cur.execute(
-            "CREATE INDEX transaction_hash_index ON traces(transaction_hash);")
+            "CREATE UNIQUE INDEX IF NOT EXISTS transaction_hash_index ON traces(transaction_hash);")
 
+    def index_subtraces(self):
+        cur = self._conn.cursor()
         cur.execute(
-            "CREATE INDEX subtraces_transaction_hash_index ON subtraces(transaction_hash);")
+            "CREATE UNIQUE INDEX IF NOT EXISTS subtraces_transaction_hash_index ON subtraces(transaction_hash);")
 
     def drop_index(self, index):
         cur = self._conn.cursor()
@@ -115,7 +123,7 @@ class SingleDatabase:
         cur = self._conn.cursor()
         cur.execute(f"DROP TABLE IF EXISTS {table};")
 
-    def insert(self, rows, show_progress=False):
+    def insert_traces(self, rows, show_progress=False):
         """
         Manual database commit is needed.
         """
@@ -151,10 +159,7 @@ class SingleDatabase:
 
         return trace_count
 
-    def commit(self):
-        self._conn.commit()
-
-    def read(self):
+    def read_traces(self):
         '''
             'transaction_hash':     STRING,     NULLABLE
             'transaction_index':    INTEGER,    NULLABLE
@@ -231,7 +236,7 @@ class EthereumDatabase:
         self._connection_cache[date] = db
         return db
 
-    def read(self, from_time, to_time):
+    def read_traces(self, from_time, to_time):
         '''
         Time range can be datetime.datetime or string.
         '''
@@ -243,5 +248,5 @@ class EthereumDatabase:
         for i in range(self._data_time_range.bisect_left(from_time), self._data_time_range.bisect_right(to_time)):
             date = self._data_time_range[i]
             db = self.get_connection(date)
-            for row in db.read():
+            for row in db.read_traces():
                 yield row
