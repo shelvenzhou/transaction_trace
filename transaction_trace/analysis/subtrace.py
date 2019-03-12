@@ -1,17 +1,19 @@
-import sqlite3
-from local.ethereum_database import EthereumDatabase
-from datetime_utils import time_to_str, date_to_str, str_to_time
-from datetime import datetime, timedelta
 import decimal
+import sqlite3
 import sys
+from datetime import datetime, timedelta
+
+from ..datetime_utils import date_to_str, str_to_time, time_to_str
+from ..local.ethereum_database import EthereumDatabase
 
 
-class SubTrace:
+class Subtrace:
+    def __init__(self, tx_hash, trace_id, level=None, seq=None, parent_level=None, parent_seq=None):
+        self.tx_hash = tx_hash
+        self.trace_id = trace_id
 
-    def __init__(self, txhash=None, id=None, level=None, seq=None, parent_level=None, parent_seq=None):
-        self.txhash = txhash
-        self.id = id
         self.parent_id = None
+
         self.level = level
         self.seq = seq
         self.parent_level = parent_level
@@ -21,26 +23,9 @@ class SubTrace:
         self.parent_id = parent_id
 
 
-class SubTraceBuilder:
-
-    def __init__(self):
-        self.local = None
-
-    def query_db(self, from_time, to_time):
-        if from_time == None:
-            return self.local.cur.execute("select rowid,* from traces")
-        else:
-            return self.local.cur.execute("select rowid,* from traces where block_timestamp >= :from_time and block_timestamp < :to_time", {"from_time": from_time, "to_time": to_time})
-
-    def write_db(self, st):
-        try:
-            self.local.cur.execute(
-                "insert into subtraces(transaction_hash, id, parent_trace_id) values(?, ?, ?);", (st.txhash, st.id, st.parent_id))
-        except sqlite3.Error as e:
-            print(e)
-
-    def clear_subtraces(self):
-        self.local.cur.execute("delete from subtraces")
+class SubtraceBuilder:
+    def __init__(self, db_folder):
+        self.database = EthereumDatabase(db_folder)
 
     def build_subtrace(self, from_time=None, to_time=None):
         traceoftxs = {}
@@ -56,11 +41,11 @@ class SubTraceBuilder:
                     else:
                         parent_level = len(trace_addr)-1
                         parent_seq = int(trace_addr[-2])
-                    st = SubTrace(txhash=row['transaction_hash'], id=row['rowid'], level=len(
-                        trace_addr), seq=int(trace_addr[-1]), parent_level=parent_level, parent_seq=parent_seq)
+                    st = Subtrace(row['transaction_hash'], row['rowid'], level=len(trace_addr), seq=int(
+                        trace_addr[-1]), parent_level=parent_level, parent_seq=parent_seq)
                 else:
-                    st = SubTrace(
-                        txhash=row['transaction_hash'], id=row['rowid'], level=0, seq=0)
+                    st = Subtrace(row['transaction_hash'],
+                                  row['rowid'], level=0, seq=0)
 
                 txhash = row['transaction_hash']
                 if txhash in traceoftxs.keys():
@@ -101,34 +86,25 @@ class SubTraceBuilder:
                         st.update_parent_id(parent_id)
                     except:
                         print(f"parent not found for {st.id}")
-                self.write_db(st)
+                # self.write_db(st)
             tx_count += 1
             sys.stdout.write(str(tx_count) + '\r')
             sys.stdout.flush()
         print(tx_count, "txs")
 
-        self.local.database_commit()
+        # self.local.database_commit()
         traceoftxs = {}
 
-    def build_subtrace_on_multidb(self, from_time, to_time):
-        date = from_time.date()
-        while date <= to_time.date():
-            print('building subtraces on', date_to_str(date))
-            self.local = EthereumDatabase(
-                f"/home/jay/w/db/bigquery_ethereum_{date_to_str(date)}.sqlite3")
-            self.clear_subtraces()
-            self.build_subtrace()
-            self.local.database_index_create()
-            date += timedelta(days=1)
 
+def main(db_folder, from_time, to_time):
+    builder = SubtraceBuilder(db_folder)
 
-def main():
-    builder = SubTraceBuilder()
-    from_time = datetime(2018, 12, 1, 0, 0, 0)
-    to_time = datetime(2018, 12, 23, 0, 0, 0)
-
-    builder.build_subtrace_on_multidb(from_time, to_time)
+    # builder.build_subtrace_on_multidb(from_time, to_time)
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) != 4:
+        print("Usage: %s database_folder from_time to_time", sys.argv[0])
+        exit(-1)
+
+    main(sys.argv[1], sys.argv[2], sys.argv[3])

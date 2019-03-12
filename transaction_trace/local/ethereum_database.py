@@ -8,7 +8,7 @@ import sys
 
 from sortedcontainers import SortedList
 
-from ..datetime_utils import date_to_str, str_to_date
+from ..datetime_utils import date_to_str, str_to_date, str_to_time
 
 l = logging.getLogger("bigquery-ethereum-crawler.local.ethereum_database")
 
@@ -69,7 +69,7 @@ class SingleDatabase:
     def create_traces_table(self):
         cur = self._conn.cursor()
         cur.execute("""
-            CREATE TABLE traces(
+            CREATE TABLE IF NOT EXISTS traces(
                 transaction_hash TEXT,
                 transaction_index INT,
                 from_address TEXT,
@@ -95,7 +95,7 @@ class SingleDatabase:
     def create_subtraces_table(self):
         cur = self._conn.cursor()
         cur.execute("""
-            CREATE TABLE subtraces(
+            CREATE TABLE IF NOT EXISTS subtraces(
                 transaction_hash TEXT,
                 trace_id INT PRIMARY KEY,
                 parent_trace_id INT
@@ -123,43 +123,29 @@ class SingleDatabase:
         cur = self._conn.cursor()
         cur.execute(f"DROP TABLE IF EXISTS {table};")
 
-    def insert_traces(self, rows, show_progress=False):
+    def insert_traces(self, rows):
         """
         Manual database commit is needed.
         """
-        trace_count = 0
-
         cur = self._conn.cursor()
-        for row in rows:
-            try:
-                cur.execute("""
-                    INSERT INTO traces(
-                        transaction_hash, transaction_index,
-                        from_address, to_address,
-                        value,
-                        input, output,
-                        trace_type,
-                        call_type,
-                        reward_type,
-                        gas, gas_used,
-                        subtraces, trace_address,
-                        error,
-                        status,
-                        block_timestamp, block_number, block_hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-                """, row)
-                trace_count += 1
-            except sqlite3.Error as e:
-                l.error("database insertion failed with error %s", e)
-                return trace_count
+        cur.execute("""
+            INSERT INTO traces(
+                transaction_hash, transaction_index,
+                from_address, to_address,
+                value,
+                input, output,
+                trace_type,
+                call_type,
+                reward_type,
+                gas, gas_used,
+                subtraces, trace_address,
+                error,
+                status,
+                block_timestamp, block_number, block_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, rows)
 
-            if show_progress:
-                sys.stdout.write(str(trace_count) + '\r')
-                sys.stdout.flush()
-
-        return trace_count
-
-    def read_traces(self):
+    def read_traces(self, with_rowid=False):
         '''
             'transaction_hash':     STRING,     NULLABLE
             'transaction_index':    INTEGER,    NULLABLE
@@ -181,9 +167,21 @@ class SingleDatabase:
             'block_number':         INTEGER,    REQUIRED
             'block_hash':           STRING,     REQUIRED
         '''
+        query_str = "SELECT rowid, * from traces" if with_rowid else "SELECT * from traces"
+
         cur = self._conn.cursor()
-        for row in cur.execute("SELECT * FROM traces"):
+        for row in cur.execute(query_str):
             yield row
+
+    def insert_subtrace(self, row):
+        cur = self._conn.cursor()
+        cur.execute("""
+            INSERT INTO subtraces(transaction_hash, trace_id, parent_trace_id) VALUES (?, ?, ?);
+        """, row)
+
+    def clear_subtraces(self):
+        cur = self._conn.cursor()
+        cur.execute("DELETE FROM subtraces")
 
 
 def data_time_range(db_folder):
