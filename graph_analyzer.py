@@ -58,15 +58,10 @@ class GraphAnalyzer(object):
                     trace_id = data['id'][index]
                     parent_trace_id = data['parent_trace_id'][index]
                     gas_used = data['gas_used'][index]
-                    if parent_trace_id == None or gas_used == None:
+                    attr = data['attr'][index]
+                    if parent_trace_id == None or gas_used == None or len(
+                            attr) != 10:
                         continue
-                    trace_input = self.local.read_from_database(
-                        table="traces",
-                        columns="input",
-                        clause="where rowid = :trace_id",
-                        vals={
-                            'trace_id': trace_id
-                        }).fetchone()["input"]
                     parent_trace_input = self.local.read_from_database(
                         table="traces",
                         columns="input",
@@ -74,9 +69,8 @@ class GraphAnalyzer(object):
                         vals={
                             'trace_id': parent_trace_id
                         }).fetchone()["input"]
-                    if len(trace_input) > 10 and len(
-                            parent_trace_input) > 10 and gas_used > 0:
-                        method_hash = trace_input[2:10]
+                    if len(parent_trace_input) > 10 and gas_used > 0:
+                        method_hash = attr
                         if method_hash in parent_trace_input:
                             callinjection = True
                             f = open(SUBTRACE_ANALYSIS_FILEPATH, "a+")
@@ -85,7 +79,7 @@ class GraphAnalyzer(object):
                             m = cycle[0]
                             self.print_and_write(f, m)
                             m = "trace id: " + str(
-                                id) + " parent trace id: " + str(
+                                trace_id) + " parent trace id: " + str(
                                     parent_trace_id)
                             self.print_and_write(f, m)
                             m = "--------------------"

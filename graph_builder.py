@@ -71,18 +71,29 @@ class DiGraphBuilder(object):
             to_address = trace['to_address']
             trace_type = trace['trace_type']
             gas_used = trace['gas_used']
+            trace_input = trace['input']
+            if trace_type == 'call':
+                if len(trace_input) > 9:
+                    attr = trace_input[:10]
+                else:
+                    attr = 'fallback'
+            else:
+                attr = trace_type
             trace_dg.add_edge(from_address, to_address)
             if 'id' not in trace_dg[from_address][to_address]:
                 trace_dg[from_address][to_address]['id'] = []
                 trace_dg[from_address][to_address]['parent_trace_id'] = []
                 trace_dg[from_address][to_address]['trace_type'] = []
                 trace_dg[from_address][to_address]['gas_used'] = []
+                trace_dg[from_address][to_address]['attr'] = []
 
             trace_dg[from_address][to_address]['id'].append(trace_id)
             trace_dg[from_address][to_address]['parent_trace_id'].append(
                 parent_trace_id)
             trace_dg[from_address][to_address]['trace_type'].append(trace_type)
             trace_dg[from_address][to_address]['gas_used'].append(gas_used)
+            trace_dg[from_address][to_address]['attr'].append(attr)
+
 
         if trace_dg.number_of_edges() < 2:
             return None
