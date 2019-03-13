@@ -15,16 +15,42 @@ class DiGraphBuilder(object):
 
     def build_digraph_on_subtraces(self):
 
-        subtrace_graphs = []
-        txs = self.local.read_from_database(
+        traces = {}
+        rows = self.local.read_from_database(
             table="traces",
-            columns="distinct transaction_hash",
-            index="INDEXED BY transaction_hash_index")
-        count = 0
-        for tx in txs:
-            trace_graph = self.build_digraph_on_subtraces_bytx(
-                tx['transaction_hash'])
+            columns=
+            "rowid, transaction_hash, from_address, to_address, input, trace_type, gas_used"
+        )
+        for row in rows:
+            tx_hash = row['transaction_hash']
+            rowid = row['rowid']
+            if tx_hash not in traces:
+                traces[tx_hash] = {}
+            keys = list(row.keys())
+            keys.remove('transaction_hash')
+            keys.remove('rowid')
+            trace = {}
+            for k in keys:
+                trace[k] = row[k]
+            traces[tx_hash][rowid] = trace
 
+        subtraces = {}
+        rows = self.local.read_from_database(table="subtraces", columns="*")
+        for row in rows:
+            tx_hash = row['transaction_hash']
+            if tx_hash not in subtraces:
+                subtraces[tx_hash] = []
+            subtrace = {}
+            for k in row.keys():
+                subtrace[k] = row[k]
+            subtraces[tx_hash].append(subtrace)
+
+        subtrace_graphs = []
+        count = 0
+        print("building graph...")
+        for tx_hash in traces:
+            trace_graph = self.build_digraph_on_subtraces_bytx(
+                tx_hash, subtraces[tx_hash], traces[tx_hash])
             count += 1
             sys.stdout.write(str(count) + '\r')
             sys.stdout.flush()
@@ -35,26 +61,12 @@ class DiGraphBuilder(object):
 
         return subtrace_graphs
 
-    def build_digraph_on_subtraces_bytx(self, transaction_hash):
-        subtraces = self.local.read_from_database(
-            table="subtraces",
-            columns="*",
-            index="INDEXED BY subtraces_transaction_hash_index",
-            clause="where transaction_hash = :tx_hash",
-            vals={'tx_hash': transaction_hash})
-        trace_dg = nx.DiGraph(transaction_hash=transaction_hash)
-
+    def build_digraph_on_subtraces_bytx(self, tx_hash, subtraces, traces):
+        trace_dg = nx.DiGraph(transaction_hash=tx_hash)
         for subtrace in subtraces:
             trace_id = subtrace['id']
             parent_trace_id = subtrace['parent_trace_id']
-            trace = self.local.read_from_database(
-                table="traces",
-                columns=
-                "transaction_hash,from_address,to_address,input,trace_type,gas_used",
-                clause="where rowid = :trace_id",
-                vals={
-                    'trace_id': trace_id
-                }).fetchone()
+            trace = traces[trace_id]
             from_address = trace['from_address']
             to_address = trace['to_address']
             trace_type = trace['trace_type']
