@@ -246,7 +246,9 @@ class Statistic(object):
         print("loading nodes from database...")
         (nodes, nodes_attr) = self.get_nodes_by_time(from_time, to_time)
 
-        mix = set()
+        subtrace_hash_record = {}
+        tree_hash_record = set()
+        tx2hashs = {}
         fun = {}
         date = from_time.date()
         while date <= to_time.date():
@@ -258,14 +260,16 @@ class Statistic(object):
                 tx_hash = tx[0]
                 subtrace_hash = tx[1]
                 node_addresses = eval(tx[2])
+                if tx_hash not in tx2hashs:
+                    tx2hashs[tx_hash] = []
+                tx2hashs[tx_hash].append(subtrace_hash[:10])
                 if tx_hash in fun:
                     continue
+                if subtrace_hash not in subtrace_hash_record:
+                    subtrace_hash_record[subtrace_hash] = 0
+                elif subtrace_hash_record[subtrace_hash] == 1:
+                    continue
                 for addresses in node_addresses:
-                    mix_hash = subtrace_hash + str(addresses)
-                    if mix_hash in mix:
-                        break
-                    else:
-                        mix.add(mix_hash)
                     node_heat = []
                     addresses.pop(0)
                     for node_address in addresses:
@@ -281,6 +285,7 @@ class Statistic(object):
                             "max"] / nodes[node_address][subtrace_hash]
                     if self.isfun(tx_attr):
                         fun[tx_hash] = tx_attr
+                        subtrace_hash_record[subtrace_hash] = 1
                         break
 
                 count += 1
@@ -289,6 +294,15 @@ class Statistic(object):
 
             print(count, "transactions")
             date += relativedelta(months=1)
+
+        txs = list(fun.keys())
+        for tx_hash in txs:
+            hashs = tx2hashs[tx_hash]
+            hashs.sort()
+            if str(hashs) in tree_hash_record:
+                fun.pop(tx_hash)
+            else:
+                tree_hash_record.add(str(hashs)) 
 
         return (fun, nodes)
 
@@ -384,8 +398,8 @@ def main(argv):
     analyzer = Statistic(DB_PATH)
     from_time = datetime(2018, 10, 7, 0, 0, 0)
     to_time = datetime(2018, 10, 7, 0, 0, 0)
-    analyzer.process_raw_data(from_time, to_time)
-    # (fun, nodes) = analyzer.analyze(from_time, to_time)
+    # analyzer.process_raw_data(from_time, to_time)
+    (fun, nodes) = analyzer.analyze(from_time, to_time)
 
     import IPython
     IPython.embed()

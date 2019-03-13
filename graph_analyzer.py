@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import sys
 
 DB_PATH = "/Users/Still/Desktop/w/db/"
-SUBTRACE_ANALYSIS_FILEPATH = "logs/subtrace_analysis"
+SUBTRACE_ANALYSIS_FILEPATH = "logs/graph_analysis"
 
 
 class GraphAnalyzer(object):
