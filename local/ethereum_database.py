@@ -152,3 +152,6 @@ class EthereumDatabase(object):
 
     def delete_on_database(self, table, clause="", vals={}):
         return self.cur.execute(f"DELETE FROM {table} {clause}", vals)
+
+    def drop_index(self, index):
+        return self.cur.execute(f"DROP INDEX IF EXISTS {index}")

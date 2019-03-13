@@ -32,8 +32,7 @@ class GraphAnalyzer(object):
         if reentrancy > 0 or callinjection:
             f = open(SUBTRACE_ANALYSIS_FILEPATH, "a+")
             m = subtrace_graph.graph['transaction_hash']
-            print(m)
-            f.write(m + "\n")
+            self.print_and_write(f, m)
             if reentrancy > 0:
                 m = "Reentrancy Attack Found!"
                 self.print_and_write(f, m)
@@ -70,7 +69,7 @@ class GraphAnalyzer(object):
                             'trace_id': parent_trace_id
                         }).fetchone()["input"]
                     if len(parent_trace_input) > 10 and gas_used > 0:
-                        method_hash = attr
+                        method_hash = attr[2:]
                         if method_hash in parent_trace_input:
                             callinjection = True
                             f = open(SUBTRACE_ANALYSIS_FILEPATH, "a+")
@@ -164,12 +163,10 @@ def main():
         fun = False
         count = 0
         for trace_graph in graphs:
-            fun = fun or analyzer.analyze_subtrace_graph(trace_graph)
+            analyzer.analyze_subtrace_graph(trace_graph)
             count += 1
             sys.stdout.write(str(count) + '\r')
             sys.stdout.flush()
-        if not fun:
-            print("no attack found")
 
         del graphs
         date += timedelta(days=1)
