@@ -4,7 +4,7 @@ from collections import defaultdict
 from ..datetime_utils import date_to_str, str_to_time, time_to_str
 from ..local.ethereum_database import EthereumDatabase
 
-l = logging.getLogger("transaction-trace.analysis.subtrace")
+l = logging.getLogger("transaction-trace.analysis.SubtraceBuilder")
 
 
 def nested_dictionary():
@@ -51,7 +51,9 @@ class SubtraceBuilder:
             db.create_subtraces_table()
             db.clear_subtraces()
 
+            l.info("Building subtrace for %s", db._filepath)
             self._build_subtrace(db)
             db.commit()
 
+            l.info("Indexing %s", db._filepath)
             db.index_subtraces()
