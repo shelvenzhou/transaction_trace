@@ -10,7 +10,7 @@ from sortedcontainers import SortedList
 
 from ..datetime_utils import date_to_str, str_to_date, str_to_time
 
-l = logging.getLogger("bigquery-ethereum-crawler.local.ethereum_database")
+l = logging.getLogger("transaction-trace.local.ethereum_database")
 
 
 def adapt_decimal(d):
@@ -108,12 +108,12 @@ class SingleDatabase:
         """
         cur = self._conn.cursor()
         cur.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS transaction_hash_index ON traces(transaction_hash);")
+            "CREATE INDEX IF NOT EXISTS transaction_hash_index ON traces(transaction_hash);")
 
     def index_subtraces(self):
         cur = self._conn.cursor()
         cur.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS subtraces_transaction_hash_index ON subtraces(transaction_hash);")
+            "CREATE INDEX IF NOT EXISTS subtraces_transaction_hash_index ON subtraces(transaction_hash);")
 
     def drop_index(self, index):
         cur = self._conn.cursor()
@@ -234,7 +234,7 @@ class EthereumDatabase:
         self._connection_cache[date] = db
         return db
 
-    def read_traces(self, from_time, to_time):
+    def get_connections(self, from_time, to_time):
         '''
         Time range can be datetime.datetime or string.
         '''
@@ -245,6 +245,12 @@ class EthereumDatabase:
 
         for i in range(self._data_time_range.bisect_left(from_time), self._data_time_range.bisect_right(to_time)):
             date = self._data_time_range[i]
-            db = self.get_connection(date)
+            yield self.get_connection(date)
+
+    def read_traces(self, from_time, to_time):
+        '''
+        Time range can be datetime.datetime or string.
+        '''
+        for db in self.get_connections(from_time, to_time):
             for row in db.read_traces():
                 yield row
