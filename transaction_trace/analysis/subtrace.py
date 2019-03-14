@@ -22,15 +22,15 @@ class SubtraceBuilder:
             trace_id = row['rowid']
             trace_address = row['trace_address']
 
-            if trace_address is None:  # root node
+            if trace_address is None:  # unique root node
                 level = 0
-                seq = 0
+                seq = "0"
                 parent_seq = -1
             else:
                 trace_addrs = trace_address.split(",")
                 level = len(trace_addrs)
-                seq = int(trace_addrs[-1])
-                parent_seq = 0 if level == 1 else int(trace_addrs[-2])
+                seq = trace_address
+                parent_seq = "0" if level == 1 else ",".join(trace_addrs[:-1])
 
             call_traces[tx_hash][level][seq] = (trace_id, parent_seq)
 
