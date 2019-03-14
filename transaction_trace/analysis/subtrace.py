@@ -1,110 +1,56 @@
-import decimal
-import sqlite3
-import sys
-from datetime import datetime, timedelta
-
+import logging
+from collections import defaultdict
 from ..datetime_utils import date_to_str, str_to_time, time_to_str
 from ..local.ethereum_database import EthereumDatabase
 
+l = logging.getLogger("transaction-trace.analysis.subtrace")
 
-class Subtrace:
-    def __init__(self, tx_hash, trace_id, level=None, seq=None, parent_level=None, parent_seq=None):
-        self.tx_hash = tx_hash
-        self.trace_id = trace_id
 
-        self.parent_id = None
-
-        self.level = level
-        self.seq = seq
-        self.parent_level = parent_level
-        self.parent_seq = parent_seq
-
-    def update_parent_id(self, parent_id):
-        self.parent_id = parent_id
+def nested_dictionary():
+    return defaultdict(nested_dictionary)
 
 
 class SubtraceBuilder:
     def __init__(self, db_folder):
         self.database = EthereumDatabase(db_folder)
 
-    def build_subtrace(self, from_time=None, to_time=None):
-        traceoftxs = {}
-        re = self.query_db(from_time, to_time)
-        try:
-            trace_count = 0
-            for row in re:
-                if row['trace_address'] != None:
-                    trace_addr = row['trace_address'].split(',')
-                    if len(trace_addr) == 1:
-                        parent_level = 0
-                        parent_seq = 0
-                    else:
-                        parent_level = len(trace_addr)-1
-                        parent_seq = int(trace_addr[-2])
-                    st = Subtrace(row['transaction_hash'], row['rowid'], level=len(trace_addr), seq=int(
-                        trace_addr[-1]), parent_level=parent_level, parent_seq=parent_seq)
-                else:
-                    st = Subtrace(row['transaction_hash'],
-                                  row['rowid'], level=0, seq=0)
+    def _build_subtrace(self, db):
+        call_traces = nested_dictionary()
+        for row in db.read_traces(with_rowid=True):
+            tx_hash = row['transaction_hash']
+            trace_id = row['rowid']
+            trace_address = row['trace_address']
 
-                txhash = row['transaction_hash']
-                if txhash in traceoftxs.keys():
-                    traceoftxs[txhash]['traces'].append(st)
-                    if st.level in traceoftxs[txhash]['trace_map'].keys():
-                        traceoftxs[txhash]['trace_map'][st.level][st.seq] = row['rowid']
-                    else:
-                        traceoftxs[txhash]['trace_map'][st.level] = {
-                            st.seq: row['rowid']}
-                else:
-                    traces = []
-                    traces.append(st)
-                    trace_map = {}
-                    trace_map[st.level] = {st.seq: row['rowid']}
-                    traceoftxs[txhash] = {
-                        'traces': traces, 'trace_map': trace_map}
+            if trace_address is None:  # root node
+                level = 0
+                seq = 0
+                parent_seq = -1
+            else:
+                trace_addrs = trace_address.split(",")
+                level = len(trace_addrs)
+                seq = int(trace_addrs[-1])
+                parent_seq = 0 if level == 1 else int(trace_addrs[-2])
 
-                trace_count += 1
-                sys.stdout.write(str(trace_count) + '\r')
-                sys.stdout.flush()
-            print(trace_count, "traces")
-        except sqlite3.DatabaseError as e:
-            error = time_to_str(from_time) + " " + \
-                time_to_str(to_time) + " " + str(e)
-            print(error)
-            with open("logs/database_error", 'a+') as f:
-                f.write(error)
-            return
+            call_traces[tx_hash][level][seq] = (trace_id, parent_seq)
 
-        tx_count = 0
-        for tx in traceoftxs.keys():
-            for st in traceoftxs[tx]['traces']:
-                parent_level = st.parent_level
-                parent_seq = st.parent_seq
-                if parent_level != None:
-                    try:
-                        parent_id = traceoftxs[tx]['trace_map'][parent_level][parent_seq]
-                        st.update_parent_id(parent_id)
-                    except:
-                        print(f"parent not found for {st.id}")
-                # self.write_db(st)
-            tx_count += 1
-            sys.stdout.write(str(tx_count) + '\r')
-            sys.stdout.flush()
-        print(tx_count, "txs")
+        for tx_hash in call_traces:
+            # hack for parent of root node
+            call_traces[tx_hash][-1][-1] = (None, None)
+            for level in call_traces[tx_hash]:
+                if level < 0:
+                    continue
 
-        # self.local.database_commit()
-        traceoftxs = {}
+                for seq in call_traces[tx_hash][level]:
+                    trace_id, parent_seq = call_traces[tx_hash][level][seq]
+                    db.insert_subtrace(
+                        (tx_hash, trace_id, call_traces[tx_hash][level-1][parent_seq][0]))
 
+    def build_subtrace(self, from_time, to_time):
+        for db in self.database.get_connections(from_time, to_time):
+            db.create_subtraces_table()
+            db.clear_subtraces()
 
-def main(db_folder, from_time, to_time):
-    builder = SubtraceBuilder(db_folder)
+            self._build_subtrace(db)
+            db.commit()
 
-    # builder.build_subtrace_on_multidb(from_time, to_time)
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("Usage: %s database_folder from_time to_time", sys.argv[0])
-        exit(-1)
-
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+            db.index_subtraces()
