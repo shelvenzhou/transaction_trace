@@ -6,7 +6,7 @@ from google.cloud import bigquery
 from ..datetime_utils import time_to_str
 from .remote_datasource import RemoteDateSource
 
-l = logging.getLogger("bigquery-ethereum-crawler.remote.ethereum_bigquery")
+l = logging.getLogger("transaction-trace.remote.ethereum_bigquery")
 
 
 class EthereumBigQuery(RemoteDateSource):

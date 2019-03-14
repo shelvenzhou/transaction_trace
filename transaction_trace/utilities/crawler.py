@@ -5,7 +5,7 @@ from datetime_utils import date_to_str, str_to_time, time_to_str
 from local.ethereum_database import EthereumDatabase
 from remote.ethereum_bigquery import EthereumBigQuery
 
-l = logging.getLogger("bigquery-ethereum-crawler")
+l = logging.getLogger("transaction-trace.utilities.crawler")
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
