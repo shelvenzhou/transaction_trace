@@ -9,7 +9,7 @@ class DiGraphBuilder(object):
     def __init__(self):
         self.local = None
 
-    def laod_database(self, db_path, date):
+    def load_database(self, db_path, date):
         self.local = EthereumDatabase(
             f"{db_path}raw/bigquery_ethereum_{date_to_str(date)}.sqlite3")
 

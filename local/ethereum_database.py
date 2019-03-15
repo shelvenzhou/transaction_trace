@@ -91,7 +91,7 @@ class EthereumDatabase(object):
         self.cur.execute("""
             CREATE TABLE subtraces(
                 transaction_hash TEXT,
-                id INT PRIMARY KEY,
+                trace_id INT PRIMARY KEY,
                 parent_trace_id INT
             );
         """)
