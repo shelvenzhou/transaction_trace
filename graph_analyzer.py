@@ -93,6 +93,7 @@ class GraphAnalyzer(object):
                     for node in cycle:
                         m = node + "->"
                         self.print_and_write(m)
+                    break
         return reentrancy
 
     def check_reentrancy_bycycle(self, graph, cycle):
