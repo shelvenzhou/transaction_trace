@@ -80,9 +80,10 @@ class GraphAnalyzer(object):
             return reentrancy
 
         for cycle in cycles:
-            count = self.check_reentrancy_bycycle(graph, cycle)
-            if count > 0:
+            (edge_count, count) = self.check_reentrancy_bycycle(graph, cycle)
+            if edge_count < 2:
                 reentrancy = 0
+            else:
                 if count > 5:
                     reentrancy = 1
                     m = "Reentrancy"
@@ -112,7 +113,7 @@ class GraphAnalyzer(object):
                 if len(trace_id) == 0:
                     break
             index -= 1
-        return len(trace_id)
+        return (len(edges), len(trace_id))
 
     def check_bonus_hunitng(self, graph):
         hunting_times = 0
