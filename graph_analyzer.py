@@ -60,7 +60,7 @@ class GraphAnalyzer(object):
                         }).fetchone()["input"]
                     if len(parent_trace_input) > 10 and gas_used > 0:
                         method_hash = attr[2:]
-                        if method_hash in parent_trace_input:
+                        if method_hash in parent_trace_input[10:]:
                             callinjection = True
                             m = "Call Injection"
                             self.print_and_write(m)
