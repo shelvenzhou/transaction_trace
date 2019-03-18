@@ -25,14 +25,15 @@ class SubtraceGraph(object):
             gas_used = trace['gas_used']
             trace_input = trace['input']
 
-            # record callee signature
+            # this can only be `call`, `create` or `suicide`
+            # when trace_type is `call`, record callee's signature
             if trace_type == 'call':
                 if len(trace_input) > 9:
-                    attr = trace_input[:10]
+                    callee = trace_input[:10]
                 else:
-                    attr = 'fallback'
+                    callee = 'fallback'
             else:
-                attr = trace_type
+                callee = trace_type
 
             subtrace_graph.add_edge(from_address, to_address)
             if 'call_trace' not in subtrace_graph[from_address][to_address]:
@@ -43,7 +44,7 @@ class SubtraceGraph(object):
                 'parent_trace_id': parent_trace_id,
                 'trace_type': trace_type,
                 'gas_used': gas_used,
-                'attr': attr,
+                'callee': callee,
             })
 
         if subtrace_graph.number_of_edges() < 2:  # ignore contracts which are never used
