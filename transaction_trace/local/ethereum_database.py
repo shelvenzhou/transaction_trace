@@ -179,6 +179,13 @@ class SingleDatabase:
             INSERT INTO subtraces(transaction_hash, trace_id, parent_trace_id) VALUES (?, ?, ?);
         """, row)
 
+    def read_subtraces(self, with_rowid=False):
+        query_str = "SELECT rowid, * from subtraces" if with_rowid else "SELECT * from subtraces"
+
+        cur = self._conn.cursor()
+        for row in cur.execute(query_str):
+            yield row
+
     def clear_subtraces(self):
         cur = self._conn.cursor()
         cur.execute("DELETE FROM subtraces")
