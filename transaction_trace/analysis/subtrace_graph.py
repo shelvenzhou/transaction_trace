@@ -61,12 +61,12 @@ class SubtraceGraph:
         for row in self._db_conn.read_traces(with_rowid=True):
             tx_hash = row["transaction_hash"]
             rowid = row["rowid"]
-            traces[tx_hash][rowid] = dict(row)
+            traces[tx_hash][rowid] = row
 
         subtraces = defaultdict(list)
         for row in self._db_conn.read_subtraces():
             tx_hash = row["transaction_hash"]
-            subtraces[tx_hash].append(dict(row))
+            subtraces[tx_hash].append(row)
 
         l.info("Begin graph construction")
         for tx_hash in traces:
