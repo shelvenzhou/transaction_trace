@@ -11,7 +11,7 @@ def main(db_folder, from_time, to_time):
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print("Usage: %s db_folder from_time to_time" % sys.argv[0])
+        print("Usage: python3 %s db_folder from_time to_time" % sys.argv[0])
         exit(-1)
 
     main(sys.argv[1], sys.argv[2], sys.argv[3])
