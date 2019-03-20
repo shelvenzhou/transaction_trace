@@ -22,7 +22,6 @@ class SubtraceGraph:
             from_address = trace["from_address"]
             to_address = trace["to_address"]
             trace_type = trace["trace_type"]
-            gas_used = trace["gas_used"]
             trace_input = trace["input"]
 
             # this can only be `call`, `create` or `suicide`
@@ -36,15 +35,16 @@ class SubtraceGraph:
                 callee = trace_type
 
             subtrace_graph.add_edge(from_address, to_address)
-            if "call_trace" not in subtrace_graph[from_address][to_address]:
-                subtrace_graph[from_address][to_address]["call_trace"] = list()
+            if "call_traces" not in subtrace_graph[from_address][to_address]:
+                subtrace_graph[from_address][to_address]["call_traces"] = list()
 
-            subtrace_graph[from_address][to_address]["call_trace"].append({
+            subtrace_graph[from_address][to_address]["call_traces"].append({
                 "trace_id": trace_id,
                 "parent_trace_id": parent_trace_id,
                 "trace_type": trace_type,
-                "gas_used": gas_used,
                 "callee": callee,
+                "gas_used": trace["gas_used"],
+                "trace_address": trace["trace_address"],
             })
 
         if subtrace_graph.number_of_edges() < 2:  # ignore contracts which are never used
@@ -88,9 +88,9 @@ class SubtraceGraphAnalyzer:
 
     def get_edges_from_cycle(self, cycle):
         edges = list()
-        for index in range(1, len(cycle)):
-            edges.append((cycle[index - 1], cycle[index]))
-        edges.append((cycle[index - 1], cycle[0]))
+        for index in range(0, len(cycle)-1):
+            edges.append((cycle[index], cycle[index+1]))
+        edges.append((cycle[-1], cycle[0]))
         return edges
 
     def find_call_injection(self, graph, traces, cycles):
@@ -106,7 +106,7 @@ class SubtraceGraphAnalyzer:
                 continue
 
             data = graph.get_edge_data(cycle[0], cycle[0])
-            for call_trace in data["call_trace"]:
+            for call_trace in data["call_traces"]:
                 trace_id = call_trace["trace_id"]
                 parent_trace_id = call_trace["parent_trace_id"]
                 gas_used = call_trace["gas_used"]
@@ -124,25 +124,40 @@ class SubtraceGraphAnalyzer:
                         self.record_abnormal_detail(
                             ABNORMAL_TYPE, "tx: %s entry: %s" % (tx_hash, cycle[0]))
 
-    def _find_reentrancy_by_cycle(self, graph, cycle):
-        edges = self.get_edges_from_cycle(cycle)
-        index = len(edges) - 1
-        trace_id = list()
-        while index > -2:
-            data = graph.get_edge_data(*edges[index])
-            if len(trace_id) == 0:
-                trace_id = data["parent_trace_id"]
-            else:
-                parent_id = list()
-                for id in trace_id:
-                    if id in data["id"]:
-                        parent_id.append(
-                            data["parent_trace_id"][data["id"].index(id)])
-                trace_id = parent_id
-                if len(trace_id) == 0:
-                    break
-            index -= 1
-        return (len(edges), len(trace_id))
+    def count_subtrace_cycle(self, graph, cycle):
+        def extract_trace_info(graph, u, v):
+            data = graph.get_edge_data(u, v)
+            for call_trace in data["call_traces"]:
+                trace_id = call_trace["trace_id"]
+                parent_trace_id = call_trace["parent_trace_id"]
+                yield parent_trace_id, trace_id
+
+        call_tree = nx.DiGraph()
+        for i in range(0, len(cycle)-1):
+            for parent_trace_id, trace_id in extract_trace_info(graph, cycle[i], cycle[i+1]):
+                if parent_trace_id is not None:
+                    call_tree.add_edge(parent_trace_id, trace_id, addr_from=cycle[i], addr_to=cycle[i+1])
+        for parent_trace_id, trace_id in extract_trace_info(graph, cycle[-1], cycle[0]):
+            if parent_trace_id is not None:
+                call_tree.add_edge(parent_trace_id, trace_id, addr_from=cycle[-1], addr_to=cycle[0])
+
+        cycle_count = defaultdict(int)
+        max_cycle_count = -1
+        for leaf in (x for x in call_tree.nodes() if call_tree.out_degree(x) == 0):
+            pred = list(call_tree.predecessors(leaf))[0]
+            loop_start = call_tree[pred][leaf]["addr_to"]
+
+            itr = pred
+            while call_tree.in_degree(itr) > 0:
+                pred = list(call_tree.predecessors(itr))[0]
+                if call_tree[pred][itr]["addr_from"] == loop_start:
+                    cycle_count[leaf] += 1
+                itr = pred
+
+            if cycle_count[leaf] > max_cycle_count:
+                max_cycle_count = cycle_count[leaf]
+
+        return cycle_count, max_cycle_count
 
     def find_reentrancy(self, graph, cycles):
         ABNORMAL_TYPE = "Reentrancy"
@@ -154,13 +169,15 @@ class SubtraceGraphAnalyzer:
 
         tx_hash = graph.graph["transaction_hash"]
         for cycle in cycles:
-            (edge_count, count) = self._find_reentrancy_by_cycle(graph, cycle)
-            if edge_count < 2:
+            if len(cycle) < 2:
                 continue
-            elif count > 5:
-                l.info("Reentrancy found for %s with loop count %d", tx_hash, count)
+
+            _, cycle_count = self.count_subtrace_cycle(graph, cycle)
+            if cycle_count > 5:
+                l.info("Reentrancy found for %s with cycle count %d",
+                       tx_hash, cycle_count)
                 self.record_abnormal_detail(
-                    ABNORMAL_TYPE, "tx: %s loop count: %d loop nodes: %s" % (tx_hash, count, cycle))
+                    ABNORMAL_TYPE, "tx: %s cycle count: %d cycle nodes: %s" % (tx_hash, cycle_count, cycle))
 
     def find_bonus_hunitng(self, graph):
         ABNORMAL_TYPE = "BonusHunting"
@@ -198,8 +215,7 @@ class SubtraceGraphAnalyzer:
             l.debug("Searching for cycles in graph")
             cycles = list(nx.simple_cycles(subtrace_graph))
 
-            import ipdb; ipdb.set_trace()
             reentrancy = self.find_reentrancy(subtrace_graph, cycles)
-            # call_injection = self.find_call_injection(
-            #     subtrace_graph, traces, cycles)
+            call_injection = self.find_call_injection(
+                subtrace_graph, traces, cycles)
             # bonus_hunting = self.find_bonus_hunitng(subtrace_graph)
