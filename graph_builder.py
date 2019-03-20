@@ -19,7 +19,7 @@ class DiGraphBuilder(object):
         rows = self.local.read_from_database(
             table="traces",
             columns=
-            "rowid, transaction_hash, from_address, to_address, input, trace_type, gas_used"
+            "rowid, transaction_hash, from_address, to_address, input, trace_type, trace_address, gas_used"
         )
         for row in rows:
             tx_hash = row['transaction_hash']
@@ -72,6 +72,7 @@ class DiGraphBuilder(object):
             trace_type = trace['trace_type']
             gas_used = trace['gas_used']
             trace_input = trace['input']
+            height = len(trace['trace_address']) if trace['trace_address'] != None else 0
             if trace_type == 'call':
                 if len(trace_input) > 9:
                     attr = trace_input[:10]
@@ -86,6 +87,7 @@ class DiGraphBuilder(object):
                 trace_dg[from_address][to_address]['trace_type'] = []
                 trace_dg[from_address][to_address]['gas_used'] = []
                 trace_dg[from_address][to_address]['attr'] = []
+                trace_dg[from_address][to_address]['height'] = []
 
             trace_dg[from_address][to_address]['id'].append(trace_id)
             trace_dg[from_address][to_address]['parent_trace_id'].append(
@@ -93,6 +95,7 @@ class DiGraphBuilder(object):
             trace_dg[from_address][to_address]['trace_type'].append(trace_type)
             trace_dg[from_address][to_address]['gas_used'].append(gas_used)
             trace_dg[from_address][to_address]['attr'].append(attr)
+            trace_dg[from_address][to_address]['height'].append(height)
 
 
         if trace_dg.number_of_edges() < 2:

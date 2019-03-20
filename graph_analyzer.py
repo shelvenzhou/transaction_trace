@@ -98,23 +98,32 @@ class GraphAnalyzer(object):
 
     def check_reentrancy_bycycle(self, graph, cycle):
         edges = self.get_edges_from_cycle(cycle)
-        index = len(edges) - 1
-        trace_id = []
-        while index > -2:
-            data = graph.get_edge_data(*edges[index])
-            if len(trace_id) == 0:
-                trace_id = data['parent_trace_id']
+        top = {'height': 0, 'trace_id': 0, 'parent_trace_id': 0, 'parent_edge_index': 0}
+        data = []
+        for e in edges:
+            data.append(graph.get_edge_data(*e))
+        for h in data[0]['height']:
+            if h > top['height']:
+                top['height'] = h
+                index = data[0]['height'].index(h)
+                top['trace_id'] = data[0]['id'][index]
+                top['parent_trace_id'] = data[0]['parent_trace_id'][index]
+                top['parent_edge_index'] = len(edges) - 1
+        turns = 0
+        while 1:
+            if top['parent_trace_id'] not in data[top['parent_edge_index']]['id']:
+                break
             else:
-                parent_id = []
-                for id in trace_id:
-                    if id in data['id']:
-                        parent_id.append(
-                            data['parent_trace_id'][data['id'].index(id)])
-                trace_id = parent_id
-                if len(trace_id) == 0:
-                    break
-            index -= 1
-        return (len(edges), len(trace_id))
+                top['height'] -= 1
+                top['trace_id'] = top['parent_trace_id']
+                index = data[top['parent_edge_index']]['id'].index(top['parent_trace_id'])
+                top['parent_trace_id'] = data[top['parent_edge_index']]['parent_trace_id'][index]
+                top['parent_edge_index'] -= 1
+                if top['parent_edge_index'] < 0:
+                    top['parent_edge_index'] = len(edges) - 1
+                    turns += 1
+        
+        return (len(edges), turns)
 
     def check_bonus_hunitng(self, graph):
         hunting_times = 0
