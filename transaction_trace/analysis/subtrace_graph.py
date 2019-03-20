@@ -1,6 +1,4 @@
 import logging
-import os
-import time
 from collections import defaultdict
 
 import networkx as nx
@@ -81,15 +79,9 @@ class SubtraceGraph:
 
 
 class SubtraceGraphAnalyzer:
-    def __init__(self, subtrace_graph, log_folder):
+    def __init__(self, subtrace_graph, log_file):
         self.subtrace_graph = subtrace_graph
-
-        log_filepath = os.path.join(
-            log_folder, "subtrace-graph-analyzer-%s.log" % str(time.strftime('%Y%m%d%H%M%S')))
-        self.log_file = open(log_filepath, "w+")
-
-    def __del__(self):
-        self.log_file.close()
+        self.log_file = log_file
 
     def record_abnormal_detail(self, abnormal_type, detail):
         print("[%s]: %s" % (abnormal_type, detail), file=self.log_file)
@@ -206,7 +198,8 @@ class SubtraceGraphAnalyzer:
             l.debug("Searching for cycles in graph")
             cycles = list(nx.simple_cycles(subtrace_graph))
 
-            # reentrancy = self.find_reentrancy(subtrace_graph, cycles)
-            call_injection = self.find_call_injection(
-                subtrace_graph, traces, cycles)
+            import ipdb; ipdb.set_trace()
+            reentrancy = self.find_reentrancy(subtrace_graph, cycles)
+            # call_injection = self.find_call_injection(
+            #     subtrace_graph, traces, cycles)
             # bonus_hunting = self.find_bonus_hunitng(subtrace_graph)
