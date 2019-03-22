@@ -136,10 +136,12 @@ class SubtraceGraphAnalyzer:
         for i in range(0, len(cycle)-1):
             for parent_trace_id, trace_id in extract_trace_info(graph, cycle[i], cycle[i+1]):
                 if parent_trace_id is not None:
-                    call_tree.add_edge(parent_trace_id, trace_id, addr_from=cycle[i], addr_to=cycle[i+1])
+                    call_tree.add_edge(
+                        parent_trace_id, trace_id, addr_from=cycle[i], addr_to=cycle[i+1])
         for parent_trace_id, trace_id in extract_trace_info(graph, cycle[-1], cycle[0]):
             if parent_trace_id is not None:
-                call_tree.add_edge(parent_trace_id, trace_id, addr_from=cycle[-1], addr_to=cycle[0])
+                call_tree.add_edge(parent_trace_id, trace_id,
+                                   addr_from=cycle[-1], addr_to=cycle[0])
 
         cycle_count = defaultdict(int)
         max_cycle_count = -1
@@ -182,24 +184,23 @@ class SubtraceGraphAnalyzer:
     def find_bonus_hunitng(self, graph):
         ABNORMAL_TYPE = "BonusHunting"
 
+        tx_hash = graph.graph["transaction_hash"]
+
         hunting_times = 0
-        edges = list(graph.edges())
-        for e in edges:
-            data = graph.get_edge_data(*e)
-            if "create" in data["callee"]:
-                out_edges = graph.out_edges(e[1])
+        for edge in graph.edges():
+            data = graph.get_edge_data(*edge)
+            if "create" in [call_trace["callee"] for call_trace in data["call_traces"]]:
+                out_edges = graph.out_edges(edge[1])
                 for out_edge in out_edges:
                     out_edge_data = graph.get_edge_data(*out_edge)
-                    if "suicide" in out_edge_data["callee"]:
+                    if "suicide" in [call_trace["callee"] for call_trace in out_edge_data["call_traces"]]:
                         hunting_times += 1
                         break
         if hunting_times > 5:
-            m = "Bonus Hunting"
-            self.print_and_write(m)
-            m = f"hunting times: {hunting_times}"
-            self.print_and_write(m)
-            return True
-        return False
+            l.info("Bonus hunting found for %s with hunting times %d",
+                   tx_hash, hunting_times)
+            self.record_abnormal_detail(
+                ABNORMAL_TYPE, "tx: %s hunting times: %d" % (tx_hash, hunting_times))
 
     def find_honeypot(self, graph):
         raise NotImplementedError("To be implemented")
@@ -218,4 +219,4 @@ class SubtraceGraphAnalyzer:
             reentrancy = self.find_reentrancy(subtrace_graph, cycles)
             call_injection = self.find_call_injection(
                 subtrace_graph, traces, cycles)
-            # bonus_hunting = self.find_bonus_hunitng(subtrace_graph)
+            bonus_hunting = self.find_bonus_hunitng(subtrace_graph)
