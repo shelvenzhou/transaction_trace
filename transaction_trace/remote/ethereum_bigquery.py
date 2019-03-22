@@ -4,7 +4,7 @@ from datetime import datetime
 from google.cloud import bigquery
 
 from ..datetime_utils import time_to_str
-from .remote_datasource import RemoteDateSource
+from .remote_data_source import RemoteDateSource
 
 l = logging.getLogger("transaction-trace.remote.ethereum_bigquery")
 
