@@ -123,27 +123,29 @@ class SingleDatabase:
         cur = self._conn.cursor()
         cur.execute(f"DROP TABLE IF EXISTS {table};")
 
+    def read(self, table, columns, conditions="", args=dict()):
+        cur = self._conn.cursor()
+        return cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)
+
+    def insert(self, table, columns, placeholders, rows):
+        cur = self._conn.cursor()
+        cur.execute(
+            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", rows)
+
+    def delete(self, table, conditions="", args=dict()):
+        cur = self._conn.cursor()
+        cur.execute(f"DELETE FROM {table} {conditions}", args)
+
     def insert_traces(self, rows):
         """
         Manual database commit is needed.
         """
-        cur = self._conn.cursor()
-        cur.execute("""
-            INSERT INTO traces(
-                transaction_hash, transaction_index,
-                from_address, to_address,
-                value,
-                input, output,
-                trace_type,
-                call_type,
-                reward_type,
-                gas, gas_used,
-                subtraces, trace_address,
-                error,
-                status,
-                block_timestamp, block_number, block_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """, rows)
+        self.insert(
+            "traces",
+            "transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash",
+            "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
+            rows
+        )
 
     def read_traces(self, with_rowid=False):
         '''
@@ -167,28 +169,26 @@ class SingleDatabase:
             'block_number':         INTEGER,    REQUIRED
             'block_hash':           STRING,     REQUIRED
         '''
-        query_str = "SELECT rowid, * from traces" if with_rowid else "SELECT * from traces"
-
-        cur = self._conn.cursor()
-        for row in cur.execute(query_str):
-            yield row
+        columns = "rowid, *" if with_rowid else "*"
+        return self.read("traces", columns)
 
     def insert_subtrace(self, row):
-        cur = self._conn.cursor()
-        cur.execute("""
-            INSERT INTO subtraces(transaction_hash, trace_id, parent_trace_id) VALUES (?, ?, ?);
-        """, row)
+        """
+        Manual database commit is needed.
+        """
+        self.insert(
+            "subtraces",
+            "transaction_hash, trace_id, parent_trace_id",
+            "?, ?, ?",
+            row
+        )
 
     def read_subtraces(self, with_rowid=False):
-        query_str = "SELECT rowid, * from subtraces" if with_rowid else "SELECT * from subtraces"
-
-        cur = self._conn.cursor()
-        for row in cur.execute(query_str):
-            yield row
+        columns = "rowid, *" if with_rowid else "*"
+        return self.read("subtraces", columns)
 
     def clear_subtraces(self):
-        cur = self._conn.cursor()
-        cur.execute("DELETE FROM subtraces")
+        self.delete("subtraces")
 
 
 def data_time_range(db_folder):
