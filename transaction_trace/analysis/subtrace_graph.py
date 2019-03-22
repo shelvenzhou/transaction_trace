@@ -216,7 +216,6 @@ class SubtraceGraphAnalyzer:
             l.debug("Searching for cycles in graph")
             cycles = list(nx.simple_cycles(subtrace_graph))
 
-            reentrancy = self.find_reentrancy(subtrace_graph, cycles)
-            call_injection = self.find_call_injection(
-                subtrace_graph, traces, cycles)
-            bonus_hunting = self.find_bonus_hunitng(subtrace_graph)
+            self.find_reentrancy(subtrace_graph, cycles)
+            self.find_call_injection(subtrace_graph, traces, cycles)
+            self.find_bonus_hunitng(subtrace_graph)
