@@ -64,7 +64,7 @@ class DiGraphBuilder(object):
     def build_digraph_on_subtraces_bytx(self, tx_hash, subtraces, traces):
         trace_dg = nx.DiGraph(transaction_hash=tx_hash)
         for subtrace in subtraces:
-            trace_id = subtrace['id']
+            trace_id = subtrace['trace_id']
             parent_trace_id = subtrace['parent_trace_id']
             trace = traces[trace_id]
             from_address = trace['from_address']

@@ -1,82 +1,44 @@
 import sqlite3
-import decimal
-from datetime_utils import *
+from datetime_utils import date_to_str
 from local.ethereum_database import EthereumDatabase
+import sys
+from datetime import datetime, timedelta
 
 
-def transfer_text(s):
-    if s == "None":
-        return None
-    return s
-
-
-def text2int(s):
-    if s == "None":
-        return None
-
-    return int(s)
-
-
-def text2decimal(s):
-    if s == "None":
-        return None
-
-    return decimal.Decimal(s)
-
-
-transfer_funcs = list((
-    transfer_text,  # transaction_hash TEXT,
-    text2int,  # transaction_index INT,
-    transfer_text,  # from_address TEXT,
-    transfer_text,  # to_address TEXT,
-    text2decimal,  # value DECIMAL,
-    transfer_text,  # input TEXT,
-    transfer_text,  # output TEXT,
-    transfer_text,  # trace_type TEXT NOT NULL,
-    transfer_text,  # call_type TEXT,
-    transfer_text,  # reward_type TEXT,
-    text2int,  # gas INT,
-    text2int,  # gas_used INT,
-    text2int,  # subtraces INT,
-    transfer_text,  # trace_address TEXT,
-    transfer_text,  # error TEXT,
-    text2int,  # status INT,
-    str_to_time,  # block_timestamp TIMESTAMP NOT NULL,
-    text2int,  # block_number INT NOT NULL,
-    transfer_text,  # block_hash STRING NOT NULL
-))
-
-
-def list_factory(cursor, row):
-    l = list()
-    for idx, _ in enumerate(cursor.description):
-        l.append(transfer_funcs[idx](row[idx]))
-    return l
-
-
-def main(db_filepath):
-    conn = sqlite3.connect(db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
-    conn.row_factory = list_factory
-    cur = conn.cursor()
-
-    local = EthereumDatabase()
-    local.database_create()
-
-    print("database created")
-
-    insert_count = 0
-    cur.execute("SELECT * FROM traces;")
-    while True:
-        rows = cur.fetchmany(100000)
-        if len(rows) == 0:
-            break
-
-        local.database_insert(rows)
-        local.database_commit()
-
-        insert_count += len(rows)
-        print("%d rows inserted" % insert_count)
+def main(db_path):
+    from_time = datetime(2018, 10, 7, 0, 0, 0)
+    to_time = datetime(2018, 10, 7, 0, 0, 0)
+    date = from_time.date()
+    print("start transfer...")
+    while date <= to_time.date():
+        print(date_to_str(date))
+        db = EthereumDatabase(
+            f"{db_path}/bigquery_ethereum_{date_to_str(date)}.sqlite3")
+        try:
+            db.read_from_database(
+                table="subtraces", columns="trace_id", clause="limit 1")
+            del db
+            print("no need to transfer")
+        except:
+            rows = db.read_from_database(
+                table="subtraces", columns="*").fetchall()
+            print(len(rows), "subtraces")
+            db.drop_index("subtraces_transaction_hash_index")
+            db.cur.execute("drop table subtraces")
+            db.cur.execute("""
+                CREATE TABLE subtraces(
+                    transaction_hash TEXT,
+                    trace_id INT PRIMARY KEY,
+                    parent_trace_id INT
+                );
+            """)
+            for row in rows:
+                db.write_into_database(table="subtraces", columns="transaction_hash, trace_id, parent_trace_id", placeholder="?, ?, ?", vals=row)
+            db.database_commit()
+            del db, rows
+            
+        date += timedelta(days=1)
 
 
 if __name__ == "__main__":
-    main("big_query_test.db")
+    main(sys.argv[1])

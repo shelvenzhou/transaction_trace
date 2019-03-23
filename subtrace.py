@@ -63,7 +63,7 @@ class SubTraceBuilder(object):
                         parent_trace_addr]
                 self.local.write_into_database(
                     "subtraces", (tx_hash, trace_id, parent_trace_id),
-                    "?, ?, ?", "transaction_hash, id, parent_trace_id")
+                    "?, ?, ?", "transaction_hash, trace_id, parent_trace_id")
 
             tx_count += 1
             sys.stdout.write(str(tx_count) + '\r')
