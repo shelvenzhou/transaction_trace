@@ -13,7 +13,7 @@ class SubtraceGraph:
         self._db_conn = db_conn
 
     def _subtrace_graph_by_tx(self, tx_hash, subtraces, traces):
-        subtrace_graph = nx.DiGraph(transaction_hash=tx_hash)
+        subtrace_graph = nx.DiGraph(transaction_hash=tx_hash, date=self._db_conn.date())
         for subtrace in subtraces:
             trace_id = subtrace["trace_id"]
             parent_trace_id = subtrace["parent_trace_id"]
@@ -61,7 +61,7 @@ class SubtraceGraph:
         return subtrace_graph
 
     def subtrace_graphs_by_tx(self):
-        l.info("Prepare data for graph construction: %s", self._db_conn)
+        l.info("Prepare data: %s", self._db_conn)
 
         traces = defaultdict(dict)
         for row in self._db_conn.read_traces(with_rowid=True):
@@ -94,8 +94,8 @@ class SubtraceGraphAnalyzer:
             f"{db_folder}/bigquery_ethereum_analysis.sqlite3")
         self.analysis_cache = dict()
 
-    def record_abnormal_detail(self, abnormal_type, detail):
-        print("[%s]: %s" % (abnormal_type, detail), file=self.log_file)
+    def record_abnormal_detail(self, date, abnormal_type, detail):
+        print("[%s][%s]: %s" % (date, abnormal_type, detail), file=self.log_file)
 
     def get_edges_from_cycle(self, cycle):
         edges = list()
@@ -159,8 +159,9 @@ class SubtraceGraphAnalyzer:
                             l.info("Call injection found for %s with entry %s, %s",
                                 tx_hash, cycle[0], injection_type)
                             self.record_abnormal_detail(
+                                graph.graph["date"],
                                 ABNORMAL_TYPE,
-                                "tx: %s entry: %s type: %s" % (tx_hash, cycle[0], injection_type))
+                                "tx: %s entry: %s %s" % (tx_hash, cycle[0], injection_type))
 
     def count_subtrace_cycle(self, graph, cycle):
         def extract_trace_info(graph, u, v):
@@ -226,6 +227,7 @@ class SubtraceGraphAnalyzer:
                 l.info("Reentrancy found for %s with cycle count %d", tx_hash,
                        cycle_count)
                 self.record_abnormal_detail(
+                    graph.graph["date"],
                     ABNORMAL_TYPE, "tx: %s cycle count: %d cycle nodes: %s" %
                     (tx_hash, cycle_count, cycle))
 
@@ -253,6 +255,7 @@ class SubtraceGraphAnalyzer:
             l.info("Bonus hunting found for %s with hunting times %d", tx_hash,
                    hunting_times)
             self.record_abnormal_detail(
+                graph.graph["date"],
                 ABNORMAL_TYPE,
                 "tx: %s hunting times: %d" % (tx_hash, hunting_times))
 

@@ -86,10 +86,10 @@ class SimpleAnalysisDatabase:
         cur = self._conn.cursor()
         cur.execute(f"DELETE FROM {table} {conditions}", args)
 
-        
+
 
 class SingleDatabase:
-    def __init__(self, db_filepath):
+    def __init__(self, db_filepath, date):
         self._filepath = db_filepath
 
         conn = sqlite3.connect(
@@ -97,9 +97,13 @@ class SingleDatabase:
         conn.row_factory = sqlite3.Row
 
         self._conn = conn
+        self._date = date
 
     def __repr__(self):
-        return "connection to %s" % self._filepath
+        return "connection to %s" % db_filename(self._date)
+    
+    def date(self):
+        return self._date
 
     def commit(self):
         self._conn.commit()
@@ -275,7 +279,7 @@ class EthereumDatabase:
             return self._connection_cache[date]
 
         db_filepath = os.path.join(self._db_folder, db_filename(date))
-        db = SingleDatabase(db_filepath)
+        db = SingleDatabase(db_filepath, date)
         self._connection_cache[date] = db
         return db
 
