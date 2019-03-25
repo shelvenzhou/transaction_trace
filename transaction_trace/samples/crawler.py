@@ -22,7 +22,7 @@ def main():
     except:
         from_time = datetime(2015, 8, 7, 0, 0, 0)
 
-    to_time = from_time + timedelta(hours=1)
+    to_time = from_time + timedelta(hours=6)
 
     while from_time < datetime(2019, 3, 20, 0, 0, 0):
         date = from_time.date()
@@ -68,7 +68,7 @@ def main():
             local.commit()
 
             from_time = to_time
-            to_time += timedelta(hours=1)
+            to_time += timedelta(hours=6)
             with open("/home/xiangjie/logs/crawl-time", "w+") as f:
                 f.write(time_to_str(from_time))
 
