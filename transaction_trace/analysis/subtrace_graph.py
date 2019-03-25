@@ -3,8 +3,7 @@ from collections import defaultdict
 
 import networkx as nx
 
-from ..local.ethereum_database import EthereumDatabase
-from ..local.extractant_database import ExtractantDatabase
+from ..local import EthereumDatabase
 
 l = logging.getLogger("transaction-trace.analysis.SubtraceGraph")
 
@@ -14,7 +13,8 @@ class SubtraceGraph:
         self._db_conn = db_conn
 
     def _subtrace_graph_by_tx(self, tx_hash, subtraces, traces):
-        subtrace_graph = nx.DiGraph(transaction_hash=tx_hash, date=self._db_conn.date())
+        subtrace_graph = nx.DiGraph(
+            transaction_hash=tx_hash, date=self._db_conn.date())
         for subtrace in subtraces:
             trace_id = subtrace["trace_id"]
             parent_trace_id = subtrace["parent_trace_id"]
@@ -79,15 +79,46 @@ class SubtraceGraph:
             yield subtrace_graph, traces, subtraces
 
 
+key_funcs = {
+    "owner": {
+        "0x13af4035": "setOwner(address)",
+        "0xe46dcfeb": "initWallet(address[],uint256,uint256)",
+        "0xf2fde38b": "transferOwnership(address)",
+        "0xf1739cae": "transferProxyOwnership(address)",
+        "0x9965b3d6": "claimProxyOwnership()",
+        "0xf00d4b5d": "changeOwner(address,address)",
+        "0x7065cb48": "addOwner(address)",
+        "0xc57c5f60": "initMultiowned(address[],uint256)",
+        "0x1b580620": "setOwner1(address)",
+        "0x5825884f": "setOwner2(address)",
+        "0xe20056e6": "replaceOwner(address,address)",
+        "0x0952c504": "requestOwnershipTransfer(address)",
+        "0x2877a49c": "AddOwnership(address)",
+        "0x4f60f334": "multiAccessAddOwner(address)",
+        "0x880cdc31": "updateOwner(address)",
+        "0x85952454": "newOwner(address)",
+    },
+    "token": {
+        "0xa9059cbb": "transfer(address,uint256)",
+        "0x23b872dd": "transferFrom(address,address,uint256)",
+        "0x095ea7b3": "approve(address,uint256)",
+        "0x42842e0e": "safeTransferFrom(address,address,uint256)",
+        "0xb88d4fde": "safeTransferFrom(address,address,uint256,bytes)",
+    },
+}
+
+
 class SubtraceGraphAnalyzer:
     def __init__(self, subtrace_graph, db_folder, log_file):
         self.subtrace_graph = subtrace_graph
         self.log_file = log_file
-        self.extractant = ExtractantDatabase(f"{db_folder}/bigquery_ethereum_analysis.sqlite3")
+
         self.analysis_cache = dict()
+        self.analysis_cache["key_func"] = key_funcs
 
     def record_abnormal_detail(self, date, abnormal_type, detail):
-        print("[%s][%s]: %s" % (date, abnormal_type, detail), file=self.log_file)
+        print("[%s][%s]: %s" %
+              (date, abnormal_type, detail), file=self.log_file)
 
     def get_edges_from_cycle(self, cycle):
         edges = list()
@@ -100,16 +131,6 @@ class SubtraceGraphAnalyzer:
         ABNORMAL_TYPE = "CallInjection"
 
         l.debug("Searching for Call Injection")
-
-        if "key_func" not in self.analysis_cache:
-            funcs = self.extractant.read(
-                table="func2hash",
-                columns="func_name, func_hash",
-                conditions="WHERE func_type = 'owner'")
-            func_dict = dict()
-            for func in funcs:
-                func_dict[func[1]] = func[0]
-            self.analysis_cache["key_func"] = func_dict
 
         tx_hash = graph.graph["transaction_hash"]
         for cycle in cycles:
@@ -242,18 +263,16 @@ class SubtraceGraphAnalyzer:
         raise NotImplementedError("To be implemented")
 
     def build_call_tree(self, subtraces):
-        tx_trees = {}
+        tx_trees = defaultdict(dict)
         for tx_hash in subtraces:
             for subtrace in subtraces[tx_hash]:
                 trace_id = subtrace["trace_id"]
                 parent_trace_id = subtrace["parent_trace_id"]
-                if tx_hash not in tx_trees:
-                    tx_trees[tx_hash] = {}
                 if parent_trace_id == None:
                     tx_trees[tx_hash][-1] = trace_id
                 else:
                     if parent_trace_id not in tx_trees[tx_hash]:
-                        tx_trees[tx_hash][parent_trace_id] = []
+                        tx_trees[tx_hash][parent_trace_id] = list()
                     tx_trees[tx_hash][parent_trace_id].append(trace_id)
         return tx_trees
 
