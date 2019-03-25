@@ -182,11 +182,14 @@ def db_filename(date):
 
 class EthereumDatabase:
 
-    def __init__(self, db_folder):
+    def __init__(self, db_folder, cache_capacity=20):
         self._db_folder = db_folder
 
         self._data_time_range = data_time_range(db_folder)
+
+        self._cache_capacity = cache_capacity
         self._connection_cache = dict()
+        self._connection_access = list()
 
     def __repr__(self):
         return "database manager of %s" % self._db_folder
@@ -203,10 +206,18 @@ class EthereumDatabase:
             return None
 
         if date in self._connection_cache:
+            self._connection_access.remove(date)
+            self._connection_access.append(date)
             return self._connection_cache[date]
+
+        if len(self._connection_cache) == self._cache_capacity:
+            lru = self._connection_access.pop(0)
+            conn = self._connection_cache.pop(lru)
+            conn.close()
 
         db_filepath = os.path.join(self._db_folder, db_filename(date))
         db = SingleDatabase(db_filepath, date)
+        self._connection_access.append(date)
         self._connection_cache[date] = db
         return db
 
