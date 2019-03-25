@@ -22,7 +22,7 @@ def main():
     except:
         from_time = datetime(2015, 8, 7, 0, 0, 0)
 
-    to_time = from_time + timedelta(hours=6)
+    to_time = from_time + timedelta(hours=24)
 
     while from_time < datetime(2019, 3, 20, 0, 0, 0):
         date = from_time.date()
@@ -59,7 +59,7 @@ def main():
             rows = remote.get_ethereum_data(from_time, to_time)
             count = 0
             for row in rows:
-                block_count = local.insert(table="blocks", 
+                local.insert(table="blocks", 
                     columns="(timestamp, number, hash, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty, size, extra_data, gas_limit, gas_used, transaction_count)", 
                     placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?", rows=row)
                 count += 1
@@ -68,7 +68,7 @@ def main():
             local.commit()
 
             from_time = to_time
-            to_time += timedelta(hours=6)
+            to_time += timedelta(hours=24)
             with open("/home/xiangjie/logs/crawl-time", "w+") as f:
                 f.write(time_to_str(from_time))
 
