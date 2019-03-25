@@ -25,10 +25,6 @@ class Database:
         cur = self._conn.cursor()
         cur.execute(f"DROP TABLE IF EXISTS {table};")
 
-    def drop_index(self, index):
-        cur = self._conn.cursor()
-        cur.execute(f"DROP INDEX IF EXISTS {index};")
-
     def read(self, table, columns, conditions="", args=dict()):
         cur = self._conn.cursor()
         return cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)

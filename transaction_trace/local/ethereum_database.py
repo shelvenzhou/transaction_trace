@@ -97,19 +97,6 @@ class SingleDatabase(Database):
             );
         """)
 
-    def index_traces(self):
-        """
-        This should ONLY be called after all data is crawled.
-        """
-        cur = self._conn.cursor()
-        cur.execute(
-            "CREATE INDEX IF NOT EXISTS transaction_hash_index ON traces(transaction_hash);")
-
-    def index_subtraces(self):
-        cur = self._conn.cursor()
-        cur.execute(
-            "CREATE INDEX IF NOT EXISTS subtraces_transaction_hash_index ON subtraces(transaction_hash);")
-
     def insert_traces(self, rows):
         """
         Manual database commit is needed.

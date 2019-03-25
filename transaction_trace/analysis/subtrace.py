@@ -54,6 +54,3 @@ class SubtraceBuilder:
             l.info("Building subtrace for %s", db._filepath)
             self._build_subtrace(db)
             db.commit()
-
-            l.info("Indexing %s", db._filepath)
-            db.index_subtraces()
