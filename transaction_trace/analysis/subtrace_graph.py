@@ -4,6 +4,7 @@ from collections import defaultdict
 import networkx as nx
 
 from ..local.ethereum_database import EthereumDatabase
+from ..local.extractant_database import ExtractantDatabase
 
 l = logging.getLogger("transaction-trace.analysis.SubtraceGraph")
 
@@ -13,7 +14,7 @@ class SubtraceGraph:
         self._db_conn = db_conn
 
     def _subtrace_graph_by_tx(self, tx_hash, subtraces, traces):
-        subtrace_graph = nx.DiGraph(transaction_hash=tx_hash)
+        subtrace_graph = nx.DiGraph(transaction_hash=tx_hash, date=self._db_conn.date())
         for subtrace in subtraces:
             trace_id = subtrace["trace_id"]
             parent_trace_id = subtrace["parent_trace_id"]
@@ -53,7 +54,7 @@ class SubtraceGraph:
         return subtrace_graph
 
     def subtrace_graphs_by_tx(self):
-        l.info("Prepare data for graph construction: %s", self._db_conn)
+        l.info("Prepare data: %s", self._db_conn)
 
         traces = defaultdict(dict)
         for row in self._db_conn.read_traces(with_rowid=True):
@@ -75,16 +76,18 @@ class SubtraceGraph:
             if subtrace_graph == None:
                 continue
 
-            yield subtrace_graph, traces
+            yield subtrace_graph, traces, subtraces
 
 
 class SubtraceGraphAnalyzer:
-    def __init__(self, subtrace_graph, log_file):
+    def __init__(self, subtrace_graph, db_folder, log_file):
         self.subtrace_graph = subtrace_graph
         self.log_file = log_file
+        self.extractant = ExtractantDatabase(f"{db_folder}/bigquery_ethereum_analysis.sqlite3")
+        self.analysis_cache = dict()
 
-    def record_abnormal_detail(self, abnormal_type, detail):
-        print("[%s]: %s" % (abnormal_type, detail), file=self.log_file)
+    def record_abnormal_detail(self, date, abnormal_type, detail):
+        print("[%s][%s]: %s" % (date, abnormal_type, detail), file=self.log_file)
 
     def get_edges_from_cycle(self, cycle):
         edges = list()
@@ -93,10 +96,20 @@ class SubtraceGraphAnalyzer:
         edges.append((cycle[-1], cycle[0]))
         return edges
 
-    def find_call_injection(self, graph, traces, cycles):
+    def find_call_injection(self, graph, cycles):
         ABNORMAL_TYPE = "CallInjection"
 
         l.debug("Searching for Call Injection")
+
+        if "key_func" not in self.analysis_cache:
+            funcs = self.extractant.read(
+                table="func2hash",
+                columns="func_name, func_hash",
+                conditions="WHERE func_type = 'owner'")
+            func_dict = dict()
+            for func in funcs:
+                func_dict[func[1]] = func[0]
+            self.analysis_cache["key_func"] = func_dict
 
         tx_hash = graph.graph["transaction_hash"]
         for cycle in cycles:
@@ -115,14 +128,29 @@ class SubtraceGraphAnalyzer:
                 if parent_trace_id == None or gas_used == None or not callee.startswith("0x"):
                     continue
 
-                parent_trace_input = traces[tx_hash][parent_trace_id]["input"]
+                parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"]
                 if len(parent_trace_input) > 10 and gas_used > 0:
-                    method_hash = callee[2:]
-                    if method_hash in parent_trace_input[10:]:
-                        l.info("Call injection found for %s with entry %s",
-                               tx_hash, cycle[0])
-                        self.record_abnormal_detail(
-                            ABNORMAL_TYPE, "tx: %s entry: %s" % (tx_hash, cycle[0]))
+                    method_hash = callee
+                    if method_hash[2:] in parent_trace_input[10:]:
+                        injection_type = None
+                        if method_hash in self.analysis_cache["key_func"]:
+                            func_name = self.analysis_cache["key_func"][method_hash]
+                            injection_type = f"func: {func_name}"
+                        if trace_id in self.analysis_cache["tx_trees"][tx_hash]:
+                            childs_traces_id = self.analysis_cache["tx_trees"][tx_hash][trace_id]
+                            for child in childs_traces_id:
+                                eth_value = self.analysis_cache["traces"][tx_hash][child]["value"]
+                                if eth_value > 0:
+                                    injection_type = f"eth transfer: {eth_value}"
+                                    break
+
+                        if injection_type != None:
+                            l.info(
+                                "Call injection found for %s with entry %s, %s",
+                                tx_hash, cycle[0], injection_type)
+                            self.record_abnormal_detail(
+                                graph.graph["date"], ABNORMAL_TYPE,
+                                "tx: %s entry: %s %s" % (tx_hash, cycle[0], injection_type))
 
     def count_subtrace_cycle(self, graph, cycle):
         def extract_trace_info(graph, u, v):
@@ -134,7 +162,8 @@ class SubtraceGraphAnalyzer:
 
         call_tree = nx.DiGraph()
         for i in range(0, len(cycle)-1):
-            for parent_trace_id, trace_id in extract_trace_info(graph, cycle[i], cycle[i+1]):
+            for parent_trace_id, trace_id in extract_trace_info(
+                    graph, cycle[i], cycle[i+1]):
                 if parent_trace_id is not None:
                     call_tree.add_edge(
                         parent_trace_id, trace_id, addr_from=cycle[i], addr_to=cycle[i+1])
@@ -179,7 +208,8 @@ class SubtraceGraphAnalyzer:
                 l.info("Reentrancy found for %s with cycle count %d",
                        tx_hash, cycle_count)
                 self.record_abnormal_detail(
-                    ABNORMAL_TYPE, "tx: %s cycle count: %d cycle nodes: %s" % (tx_hash, cycle_count, cycle))
+                    graph.graph["date"], ABNORMAL_TYPE, "tx: %s cycle count: %d cycle nodes: %s" %
+                    (tx_hash, cycle_count, cycle))
 
     def find_bonus_hunitng(self, graph):
         ABNORMAL_TYPE = "BonusHunting"
@@ -200,7 +230,7 @@ class SubtraceGraphAnalyzer:
             l.info("Bonus hunting found for %s with hunting times %d",
                    tx_hash, hunting_times)
             self.record_abnormal_detail(
-                ABNORMAL_TYPE, "tx: %s hunting times: %d" % (tx_hash, hunting_times))
+                graph.graph["date"], ABNORMAL_TYPE, "tx: %s hunting times: %d" % (tx_hash, hunting_times))
 
     def find_honeypot(self, graph):
         raise NotImplementedError("To be implemented")
@@ -211,11 +241,33 @@ class SubtraceGraphAnalyzer:
     def find_missing_libraries(self, graph):
         raise NotImplementedError("To be implemented")
 
+    def build_call_tree(self, subtraces):
+        tx_trees = {}
+        for tx_hash in subtraces:
+            for subtrace in subtraces[tx_hash]:
+                trace_id = subtrace["trace_id"]
+                parent_trace_id = subtrace["parent_trace_id"]
+                if tx_hash not in tx_trees:
+                    tx_trees[tx_hash] = {}
+                if parent_trace_id == None:
+                    tx_trees[tx_hash][-1] = trace_id
+                else:
+                    if parent_trace_id not in tx_trees[tx_hash]:
+                        tx_trees[tx_hash][parent_trace_id] = []
+                    tx_trees[tx_hash][parent_trace_id].append(trace_id)
+        return tx_trees
+
     def find_all_abnormal_behaviors(self):
-        for subtrace_graph, traces in self.subtrace_graph.subtrace_graphs_by_tx():
+        for subtrace_graph, traces, subtraces in self.subtrace_graph.subtrace_graphs_by_tx():
             l.debug("Searching for cycles in graph")
             cycles = list(nx.simple_cycles(subtrace_graph))
 
+            if "traces" not in self.analysis_cache:
+                self.analysis_cache["traces"] = traces
+            if "tx_trees" not in self.analysis_cache:
+                self.analysis_cache["tx_trees"] = self.build_call_tree(
+                    subtraces)
+
             self.find_reentrancy(subtrace_graph, cycles)
-            self.find_call_injection(subtrace_graph, traces, cycles)
+            self.find_call_injection(subtrace_graph, cycles)
             self.find_bonus_hunitng(subtrace_graph)
