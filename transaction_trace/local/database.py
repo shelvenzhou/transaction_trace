@@ -32,7 +32,7 @@ class Database:
     def insert(self, table, columns, placeholders, rows):
         cur = self._conn.cursor()
         cur.execute(
-            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", rows)
+            f"INSERT INTO {table}{columns} VALUES ({placeholders})", rows)
 
     def delete(self, table, conditions="", args=dict()):
         cur = self._conn.cursor()
