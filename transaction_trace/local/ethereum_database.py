@@ -9,6 +9,7 @@ import sys
 from sortedcontainers import SortedList
 
 from ..datetime_utils import date_to_str, str_to_date, str_to_time
+from .database import Database
 
 l = logging.getLogger("transaction-trace.local.ethereum_database")
 
@@ -50,25 +51,15 @@ sqlite3.register_converter('timestamp', tz_aware_timestamp_adapter)
 sqlite3.register_adapter(decimal.Decimal, adapt_decimal)
 
 
-class SingleDatabase:
+class SingleDatabase(Database):
     def __init__(self, db_filepath, date):
-        self._filepath = db_filepath
+        super(SingleDatabase, self).__init__(db_filepath)
 
-        conn = sqlite3.connect(
-            db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
-        conn.row_factory = sqlite3.Row
-
-        self._conn = conn
         self._date = date
 
-    def __repr__(self):
-        return "connection to %s" % db_filename(self._date)
-
+    @property
     def date(self):
         return self._date
-
-    def commit(self):
-        self._conn.commit()
 
     def create_traces_table(self):
         cur = self._conn.cursor()
@@ -118,27 +109,6 @@ class SingleDatabase:
         cur = self._conn.cursor()
         cur.execute(
             "CREATE INDEX IF NOT EXISTS subtraces_transaction_hash_index ON subtraces(transaction_hash);")
-
-    def drop_index(self, index):
-        cur = self._conn.cursor()
-        cur.execute(f"DROP INDEX IF EXISTS {index};")
-
-    def drop_table(self, table):
-        cur = self._conn.cursor()
-        cur.execute(f"DROP TABLE IF EXISTS {table};")
-
-    def read(self, table, columns, conditions="", args=dict()):
-        cur = self._conn.cursor()
-        return cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)
-
-    def insert(self, table, columns, placeholders, rows):
-        cur = self._conn.cursor()
-        cur.execute(
-            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", rows)
-
-    def delete(self, table, conditions="", args=dict()):
-        cur = self._conn.cursor()
-        cur.execute(f"DELETE FROM {table} {conditions}", args)
 
     def insert_traces(self, rows):
         """
@@ -214,17 +184,12 @@ class EthereumDatabase:
 
     def __init__(self, db_folder):
         self._db_folder = db_folder
-        self._table_name = "traces"
 
         self._data_time_range = data_time_range(db_folder)
         self._connection_cache = dict()
 
     def __repr__(self):
         return "database manager of %s" % self._db_folder
-
-    @property
-    def table_name(self):
-        return self._table_name
 
     @property
     def time_range(self):

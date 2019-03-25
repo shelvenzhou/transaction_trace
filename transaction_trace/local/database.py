@@ -19,11 +19,15 @@ class Database:
 
     def create_table(self, table_name, columns):
         cur = self._conn.cursor()
-        cur.execute(f"CREATE TABLE IF NOT EXISTS {table_name}{columns};")
+        cur.execute(f"CREATE TABLE IF NOT EXISTS {table_name}({columns});")
 
     def drop_table(self, table):
         cur = self._conn.cursor()
         cur.execute(f"DROP TABLE IF EXISTS {table};")
+
+    def drop_index(self, index):
+        cur = self._conn.cursor()
+        cur.execute(f"DROP INDEX IF EXISTS {index};")
 
     def read(self, table, columns, conditions="", args=dict()):
         cur = self._conn.cursor()
