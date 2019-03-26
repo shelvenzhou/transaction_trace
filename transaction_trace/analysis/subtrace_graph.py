@@ -14,7 +14,7 @@ class SubtraceGraph:
 
     def _subtrace_graph_by_tx(self, tx_hash, subtraces, traces):
         subtrace_graph = nx.DiGraph(
-            transaction_hash=tx_hash, date=self._db_conn.date())
+            transaction_hash=tx_hash, date=self._db_conn.date)
         for subtrace in subtraces:
             trace_id = subtrace["trace_id"]
             parent_trace_id = subtrace["parent_trace_id"]

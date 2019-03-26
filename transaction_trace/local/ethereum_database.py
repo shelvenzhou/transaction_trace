@@ -200,7 +200,7 @@ class EthereumDatabase:
         if len(self._connection_cache) == self._cache_capacity:
             lru = self._connection_access.pop(0)
             conn = self._connection_cache.pop(lru)
-            conn.close()
+            del conn
 
         db_filepath = os.path.join(self._db_folder, db_filename(date))
         db = SingleDatabase(db_filepath, date)
