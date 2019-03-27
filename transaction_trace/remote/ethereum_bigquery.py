@@ -15,8 +15,9 @@ class EthereumBigQuery(RemoteDateSource):
 
     def get_ethereum_data(self, from_time, to_time):
         query_str = (
-            f'SELECT * FROM `bigquery-public-data.ethereum_blockchain.blocks` '
-            f'WHERE timestamp >= "{time_to_str(from_time)}" AND timestamp < "{time_to_str(to_time)}"'
+            # f'SELECT * FROM `bigquery-public-data.ethereum_blockchain.blocks` '
+            f'SELECT * FROM `bigquery-public-data.ethereum_blockchain.transactions` '
+            f'WHERE block_timestamp >= "{time_to_str(from_time)}" AND block_timestamp < "{time_to_str(to_time)}"'
         )
 
         return self.client.query(query_str).result()
