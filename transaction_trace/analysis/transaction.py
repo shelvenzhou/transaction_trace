@@ -3,7 +3,7 @@ from collections import defaultdict
 from sortedcontainers import SortedDict
 from datetime import timedelta, timezone
 
-from ..datetime_utils import str_to_date
+from ..datetime_utils import str_to_date, time_to_str
 from ..local import EthereumDatabase
 
 l = logging.getLogger("transaction-trace.analysis.TransactionAnalyzer")
@@ -14,14 +14,23 @@ class TransactionAnalyzer:
         self.database = EthereumDatabase(db_folder)
         self.log_file = log_file
 
-    def find_honeypot(self, from_time, to_time):
+    def record_abnormal_detail(self, date, abnormal_type, detail):
+        print("[%s][%s]: %s" %
+              (date, abnormal_type, detail), file=self.log_file)
+
+    def find_honeypot(self, from_time, to_time, value_limit=10000000000000000000):
+        ABNORMAL_TYPE = "Honeypot"
+
         class STATUS:
             CREATED = 0
             INITIALIZED = 1
             PROFITED = 2
+            WITHDRAWED = 3
+            PROFIT_WITHDRAWED = 4
 
         # contract addr -> HONEYPOT_STATUS
         tracked_honeypot = dict()
+        honeypot_create_times = dict()
         # contracts failed to be initialized in 30min will not be tracked
         last_created = set()
         current_created = set()
@@ -55,14 +64,16 @@ class TransactionAnalyzer:
 
             for block_number in sorted(traces):
                 block_txs = traces[block_number]
+                block_time = block_times[block_number]
 
-                if block_times[block_number] > window_end:
+                if block_time > window_end:
                     # window move
                     window_start = window_end
                     window_end = window_start + WINDOW_LENGTH
 
                     for contract in last_created:
                         tracked_honeypot.pop(contract, None)
+                        honeypot_create_times.pop(contract, None)
 
                     last_created = current_created
                     current_created = set()
@@ -75,35 +86,87 @@ class TransactionAnalyzer:
                         to_addr = trace["to_address"]
                         from_addr = trace["from_address"]
 
+                        if trace["error"] is not None:
+                            break
+
                         if trace["trace_type"] == "create":
-                            if to_addr is None: # failed create
+                            if to_addr is None:  # failed create
                                 break
                             current_created.add(to_addr)
                             tracked_honeypot[to_addr] = STATUS.CREATED
+                            honeypot_create_times[to_addr] = block_time
                             l.debug("TX %s creates %s", tx_hash, to_addr)
                             break
 
                         value = trace["value"]
-                        if value > 0:
+                        if value >= 500000000000000000:  # 0.5 ETH
                             if to_addr in current_created or to_addr in last_created:
                                 l.debug("TX %s transfers %d to %s",
-                                       tx_hash, value, to_addr)
+                                        tx_hash, value, to_addr)
 
                                 if to_addr in current_created:
                                     current_created.remove(to_addr)
                                 if to_addr in current_created:
                                     last_created.remove(to_addr)
 
-                                tracked_honeypot[to_addr] = STATUS.INITIALIZED
-                                l.info("Potential honeypot initialized in %s", to_addr)
+                                if value <= value_limit:
+                                    tracked_honeypot[to_addr] = STATUS.INITIALIZED
+                                    l.debug(
+                                        "potential honeypot initialized in %s", to_addr)
+                                else:
+                                    tracked_honeypot.pop(to_addr)
+                                    honeypot_create_times.pop(to_addr, None)
+                                    l.debug(
+                                        "too large initialization for %s", to_addr)
 
                             elif to_addr in tracked_honeypot:
-                                if tracked_honeypot[to_addr] == STATUS.INITIALIZED:
+                                l.debug("%s receives %d", to_addr, value)
+
+                                if value > value_limit:
+                                    tracked_honeypot.pop(to_addr)
+                                    honeypot_create_times.pop(to_addr, None)
+                                elif tracked_honeypot[to_addr] == STATUS.INITIALIZED:
                                     tracked_honeypot[to_addr] = STATUS.PROFITED
-                                l.debug("[Honeypot] %s receives %d", to_addr, value)
 
                             elif from_addr in tracked_honeypot:
+                                if tracked_honeypot[from_addr] == STATUS.WITHDRAWED or tracked_honeypot[from_addr] == STATUS.PROFIT_WITHDRAWED:
+                                    tracked_honeypot.pop(from_addr)
+                                    honeypot_create_times.pop(to_addr, None)
+                                    l.debug(
+                                        "duplicated withdraws from %s indicate not honeypot", from_addr)
+                                    break
+
                                 if tracked_honeypot[from_addr] == STATUS.INITIALIZED:
-                                    l.info("[Honeypot] %s takes %d back", from_addr, value)
+                                    tracked_honeypot[from_addr] = STATUS.WITHDRAWED
+                                    l.debug("%s takes %d back",
+                                            from_addr, value)
                                 else:
-                                    l.info("[Honeypot] %s takes %d back with profit", from_addr, value)
+                                    tracked_honeypot[from_addr] = STATUS.PROFIT_WITHDRAWED
+                                    l.debug(
+                                        "%s takes %d back with profit", from_addr, value)
+
+        for contract in tracked_honeypot:
+            if tracked_honeypot[contract] == STATUS.INITIALIZED:
+                self.record_abnormal_detail(
+                    time_to_str(honeypot_create_times[contract]),
+                    ABNORMAL_TYPE,
+                    "Initialized honeypot %s" % contract
+                )
+            elif tracked_honeypot[contract] == STATUS.PROFITED:
+                self.record_abnormal_detail(
+                    time_to_str(honeypot_create_times[contract]),
+                    ABNORMAL_TYPE,
+                    "Honeypot with profit %s" % contract
+                )
+            elif tracked_honeypot[contract] == STATUS.WITHDRAWED:
+                self.record_abnormal_detail(
+                    time_to_str(honeypot_create_times[contract]),
+                    ABNORMAL_TYPE,
+                    "Closed honeypot %s" % contract
+                )
+            elif tracked_honeypot[contract] == STATUS.PROFIT_WITHDRAWED:
+                self.record_abnormal_detail(
+                    time_to_str(honeypot_create_times[contract]),
+                    ABNORMAL_TYPE,
+                    "Closed profited honeypot %s" % contract
+                )
