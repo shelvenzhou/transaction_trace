@@ -49,9 +49,15 @@ class TransactionAnalyzer:
 
             l.info("Prepare data from %s", db_conn)
             for row in db_conn.read_traces(with_rowid=True):
+                if row["error"] is not None:
+                    continue
+
                 block_number = row["block_number"]
                 tx_index = row["transaction_index"]
                 block_time = row["block_timestamp"]
+
+                if block_number is None or tx_index is None:
+                    continue
 
                 if block_number not in block_times:
                     block_times[block_number] = block_time
@@ -86,9 +92,6 @@ class TransactionAnalyzer:
                         to_addr = trace["to_address"]
                         from_addr = trace["from_address"]
 
-                        if trace["error"] is not None:
-                            break
-
                         if trace["trace_type"] == "create":
                             if to_addr is None:  # failed create
                                 break
@@ -114,7 +117,7 @@ class TransactionAnalyzer:
                                     l.debug(
                                         "potential honeypot initialized in %s", to_addr)
                                 else:
-                                    tracked_honeypot.pop(to_addr)
+                                    tracked_honeypot.pop(to_addr, None)
                                     honeypot_create_times.pop(to_addr, None)
                                     l.debug(
                                         "too large initialization for %s", to_addr)
