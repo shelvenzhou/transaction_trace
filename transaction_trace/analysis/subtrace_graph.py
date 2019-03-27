@@ -109,7 +109,7 @@ key_funcs = {
 
 
 class SubtraceGraphAnalyzer:
-    def __init__(self, subtrace_graph, db_folder, log_file):
+    def __init__(self, subtrace_graph, log_file):
         self.subtrace_graph = subtrace_graph
         self.log_file = log_file
 
@@ -252,15 +252,6 @@ class SubtraceGraphAnalyzer:
                    tx_hash, hunting_times)
             self.record_abnormal_detail(
                 graph.graph["date"], ABNORMAL_TYPE, "tx: %s hunting times: %d" % (tx_hash, hunting_times))
-
-    def find_honeypot(self, graph):
-        raise NotImplementedError("To be implemented")
-
-    def find_mishandled_exception(self, graph):
-        raise NotImplementedError("To be implemented")
-
-    def find_missing_libraries(self, graph):
-        raise NotImplementedError("To be implemented")
 
     def build_call_tree(self, subtraces):
         tx_trees = defaultdict(dict)

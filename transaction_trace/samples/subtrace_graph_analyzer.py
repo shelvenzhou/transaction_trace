@@ -13,7 +13,7 @@ def main(db_folder, from_time, to_time, log_path):
         for db_conn in db.get_connections(from_time, to_time):
             subtrace_graph = SubtraceGraph(db_conn)
             subtrace_graph_analyzer = SubtraceGraphAnalyzer(
-                subtrace_graph, db_folder, log_file)
+                subtrace_graph, log_file)
 
             subtrace_graph_analyzer.find_all_abnormal_behaviors()
 
