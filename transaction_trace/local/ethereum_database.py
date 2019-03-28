@@ -31,7 +31,7 @@ def tz_aware_timestamp_adapter(val):
             tzinfo = datetime.timezone(
                 datetime.timedelta(hours=hours, minutes=minutes))
     else:
-        tzinfo = None
+        tzinfo = datetime.timezone.utc
 
     timepart_full = timepart.split(b".")
     hours, minutes, seconds = map(int, timepart_full[0].split(b":"))
