@@ -2,8 +2,9 @@ import sqlite3
 
 
 class Database:
-    def __init__(self, db_filepath):
+    def __init__(self, db_filepath, date):
         self._filepath = db_filepath
+        self._date = date
 
         conn = sqlite3.connect(
             db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
@@ -13,6 +14,10 @@ class Database:
 
     def __repr__(self):
         return "connection to %s" % self._filepath
+
+    @property
+    def date(self):
+        return self._date
 
     def commit(self):
         self._conn.commit()
@@ -32,7 +37,7 @@ class Database:
     def insert(self, table, columns, placeholders, rows):
         cur = self._conn.cursor()
         cur.execute(
-            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", rows)
+            f"INSERT INTO {table}{columns} VALUES ({placeholders})", rows)
 
     def delete(self, table, conditions="", args=dict()):
         cur = self._conn.cursor()
