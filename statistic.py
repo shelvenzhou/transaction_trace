@@ -112,13 +112,11 @@ class Statistic(object):
                     back -= 1
                 continue
             childs_id = tree[trace_id]
-            if len(childs_id) == 1:
-                dfs_stack.append(childs_id[0])
-                back_step[-1] += 1
-            else:
-                for child in childs_id:
-                    dfs_stack.append(child)
-                    back_step.append(1)
+            back_step[-1] += 1
+            for child in childs_id:
+                dfs_stack.append(child)
+                back_step.append(1)
+            back_step.pop()
         return paths
 
     def build_trace_graph(self, graph=None):
