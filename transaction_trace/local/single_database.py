@@ -182,7 +182,7 @@ class SingleTransactionDatabase(Database):
     def create_txs_table(self):
         self.create_table(
             table_name="transactions",
-            columns='''(
+            columns='''
                 hash TEXT PRIMARY KEY,
                 nonce INT NOT NULL,
                 transaction_index INT NOT NULL,
@@ -200,7 +200,7 @@ class SingleTransactionDatabase(Database):
                 block_timestamp TIMESTAMP NOT NULL,
                 block_number INT NOT NULL,
                 block_hash TEXT NOT NULL
-            )''')
+            ''')
 
     def insert_txs(self, rows):
         self.insert(

@@ -37,17 +37,18 @@ def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
     remote = EthereumBigQuery()
     db_name = db_folder.split("_")[-1]
     # data insertion
-    try:
-        with open(crawl_time_path, "r") as f:
-            from_time = str_to_time(f.readline())
-    except:
-        if from_time == None:
-            print("from_time not set")
+    if from_time == None:
+        try:
+            with open(crawl_time_path, "r") as f:
+                from_time = str_to_time(f.readline())
+        except:
+            print("crawl-time log not found, from_time need to be set")
             exit(-1)
+    else:
         from_time = str_to_date(from_time)
     t_time = from_time + timedelta(hours=int(time_interval))
 
-    while from_time < str_to_date(to_time):
+    while from_time <= str_to_date(to_time):
         date = from_time.date()
         date_str = date_to_str(date)
         db_filepath = os.path.join(db_folder, db_filename(db_name, date_str))
@@ -70,7 +71,7 @@ def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
             db.commit()
 
             from_time = t_time
-            t_time += timedelta(hours=1)
+            t_time += timedelta(hours=int(time_interval))
             with open(crawl_time_path, "w+") as f:
                 f.write(time_to_str(from_time))
 
