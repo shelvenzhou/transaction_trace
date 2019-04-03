@@ -130,13 +130,11 @@ class TransactionAnalyzer:
 
         for db_conn in self.database.get_connections(from_time, to_time):
             traces = defaultdict(dict)
+            error_txs = set()
             block_times = dict()
 
             l.info("Prepare data from %s", db_conn)
             for row in db_conn.read_traces(with_rowid=True):
-                if row["error"] is not None:
-                    continue
-
                 block_number = row["block_number"]
                 tx_index = row["transaction_index"]
                 block_time = row["block_timestamp"]
@@ -146,6 +144,13 @@ class TransactionAnalyzer:
 
                 if block_number not in block_times:
                     block_times[block_number] = block_time
+
+                if row["error"] is not None:
+                    error_txs.add((block_number, tx_index))
+                    traces[block_number].pop(tx_index, None)
+                    continue
+                if (block_number, tx_index) in error_txs:
+                    continue
 
                 if tx_index not in traces[block_number]:
                     traces[block_number][tx_index] = list()
