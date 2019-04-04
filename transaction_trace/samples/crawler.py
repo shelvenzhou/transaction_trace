@@ -77,12 +77,12 @@ def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
+    if len(sys.argv) < 5 or len(sys.argv) > 6:
         print("Usage: python3 %s db_folder crawl_time_path time_interval to_time [from_time]" %
               sys.argv[0])
         exit(-1)
 
     if len(sys.argv) == 5:
-        sys.argv[5] = None
+        sys.argv.append(None)
 
     main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
