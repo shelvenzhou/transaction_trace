@@ -208,3 +208,32 @@ class SingleTransactionDatabase(Database):
             columns="",
             placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
             rows=rows)
+
+
+class SingleTokenTransferDatabase(Database):
+    def __init__(self, db_filepath, date):
+        super(SingleTokenTransferDatabase, self).__init__(db_filepath, date)
+
+    def create_token_transfers_table(self):
+        self.create_table(
+            table_name="token_transfers",
+            columns='''
+                token_address TEXT NOT NULL,
+                from_address TEXT,
+                to_address TEXT,
+                value TEXT,
+                transaction_hash TEXT NOT NULL,
+                log_index INT NOT NULL,
+                block_timestamp TIMESTAMP NOT NULL,
+                block_number INT NOT NULL,
+                block_hash TEXT NOT NULL,
+                PRIMARY KEY(transaction_hash, log_index)
+            ''')
+
+    def insert_token_transfers(self, rows):
+        self.insert(
+            table="token_transfers",
+            columns="",
+            placeholders="? ,?, ?, ?, ? ,?, ?, ?, ?",
+            rows=rows
+        )

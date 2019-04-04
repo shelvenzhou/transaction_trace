@@ -29,13 +29,16 @@ database_map = {
         "class_name": "SingleTransactionDatabase",
         "create": "create_txs_table",
         "insert": "insert_txs"
+    },
+    "token_transfers": {
+        "class_name": "SingleTokenTransferDatabase",
+        "create": "create_token_transfers_table",
+        "insert": "insert_token_transfers"
     }
 }
 
-
-def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
+def main(db_folder, db_name, crawl_time_path, time_interval, to_time, from_time):
     remote = EthereumBigQuery()
-    db_name = db_folder.split("_")[-1]
     # data insertion
     if from_time == None:
         try:
@@ -67,7 +70,7 @@ def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
             for row in rows:
                 getattr(db, database_map[db_name]["insert"])(row)
                 count += 1
-            print(count, "txs")
+            print(count, "items")
             db.commit()
 
             from_time = t_time
@@ -77,12 +80,12 @@ def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5 or len(sys.argv) > 6:
-        print("Usage: python3 %s db_folder crawl_time_path time_interval to_time [from_time]" %
+    if len(sys.argv) < 6 or len(sys.argv) > 7:
+        print("Usage: python3 %s db_folder db_name crawl_time_path time_interval to_time [from_time]" %
               sys.argv[0])
         exit(-1)
 
-    if len(sys.argv) == 5:
+    if len(sys.argv) == 6:
         sys.argv.append(None)
 
-    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
