@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-
+from web3 import Web3
 import networkx as nx
 
 from ..local import EthereumDatabase
@@ -153,16 +153,19 @@ class SubtraceGraphAnalyzer:
                 if len(parent_trace_input) > 10 and gas_used > 0:
                     method_hash = callee
                     if method_hash[2:] in parent_trace_input[10:]:
-                        injection_type = None
-                        if method_hash in self.analysis_cache["key_func"]:
-                            func_name = self.analysis_cache["key_func"][method_hash]
-                            injection_type = f"func: {func_name}"
+                        func_name = ""
+
+                        if method_hash in self.analysis_cache["key_func"]["owner"]:
+                            func_name = self.analysis_cache["key_func"]["owner"][method_hash]
+                        elif method_hash in self.analysis_cache["key_func"]["token"]:
+                            func_name = self.analysis_cache["key_func"]["token"][method_hash]
+                        injection_type = f"injection type: {func_name} "
                         if trace_id in self.analysis_cache["tx_trees"][tx_hash]:
                             childs_traces_id = self.analysis_cache["tx_trees"][tx_hash][trace_id]
                             for child in childs_traces_id:
-                                eth_value = self.analysis_cache["traces"][tx_hash][child]["value"]
+                                eth_value = Web3.fromWei(self.analysis_cache["traces"][tx_hash][child]["value"], "ether")
                                 if eth_value > 0:
-                                    injection_type = f"eth transfer: {eth_value}"
+                                    injection_type += f"eth transfer: {eth_value}"
                                     break
 
                         if injection_type != None:
