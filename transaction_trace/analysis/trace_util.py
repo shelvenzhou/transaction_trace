@@ -1,3 +1,6 @@
+from collections import defaultdict
+
+
 class TraceUtil:
     @staticmethod
     def build_call_tree(subtraces):
@@ -42,9 +45,9 @@ class TraceUtil:
         return paths
 
     @staticmethod
-    def generate_path_signature_for_tx(tx_hash, traces, specified_trace_id=None):
+    def generate_path_signature_for_tx(tx_hash, traces, tx_paths, specified_trace_id=None):
         path_sigs = set()
-        for path in self.analysis_cache["tx_paths"][tx_hash]:
+        for path in tx_paths[tx_hash]:
             if specified_trace_id == None or specified_trace_id in path:
                 subtraces = []
                 for trace_id in path:

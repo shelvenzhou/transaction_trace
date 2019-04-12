@@ -232,7 +232,7 @@ class SubtraceGraphAnalyzer:
 
         return cycle_count, max_cycle_count
 
-    def find_reentrancy(self, graph, cycles):
+    def find_reentrancy(self, graph, cycles, eth=None):
         ABNORMAL_TYPE = "Reentrancy"
 
         l.debug("Searching for Reentrancy")
@@ -240,6 +240,7 @@ class SubtraceGraphAnalyzer:
         if len(cycles) == 0:
             return
 
+        f = False
         tx_hash = graph.graph["transaction_hash"]
         for cycle in cycles:
             if len(cycle) < 2:
@@ -252,6 +253,31 @@ class SubtraceGraphAnalyzer:
                 self.record_abnormal_detail(
                     graph.graph["date"], ABNORMAL_TYPE, "tx: %s cycle count: %d cycle nodes: %s" %
                     (tx_hash, cycle_count, cycle))
+                f = True
+        if f and eth != None:
+            eth_transfer = defaultdict(lambda: defaultdict(int))
+            for trace in self.analysis_cache["traces"][tx_hash].values():
+                value = trace["value"]
+                from_address = trace["from_address"]
+                to_address = trace["to_address"]
+                if value > 0:
+                    eth_transfer[from_address][to_address] += float(
+                        Web3.fromWei(value, "ether"))
+            eth_nodes = defaultdict(int)
+            for from_address in eth_transfer:
+                for to_address in eth_transfer[from_address]:
+                    value = eth_transfer[from_address][to_address]
+                    eth_nodes[from_address] -= value
+                    eth_nodes[to_address] += value
+            eth[tx_hash] = eth_nodes
+
+            lost = 0
+            for node in eth[tx_hash]:
+                if eth[tx_hash][node] < lost:
+                    lost = eth[tx_hash][node]
+            l.info("Reentrancy eth lost for %s: %d", tx_hash, lost)
+            self.record_abnormal_detail(
+                graph.graph["date"], ABNORMAL_TYPE, "tx: %s eth lost: %d" % (tx_hash, lost))
 
     def find_bonus_hunitng(self, graph):
         ABNORMAL_TYPE = "BonusHunting"
@@ -274,8 +300,7 @@ class SubtraceGraphAnalyzer:
             self.record_abnormal_detail(
                 graph.graph["date"], ABNORMAL_TYPE, "tx: %s hunting times: %d" % (tx_hash, hunting_times))
 
-
-    def find_all_abnormal_behaviors(self):
+    def find_all_abnormal_behaviors(self, eth_lost=None):
         for subtrace_graph, traces, subtraces in self.subtrace_graph.subtrace_graphs_by_tx():
             l.debug("Searching for cycles in graph")
             cycles = list(nx.simple_cycles(subtrace_graph))
@@ -286,6 +311,6 @@ class SubtraceGraphAnalyzer:
                 self.analysis_cache["tx_trees"] = TraceUtil.build_call_tree(
                     subtraces)
 
-            self.find_reentrancy(subtrace_graph, cycles)
+            self.find_reentrancy(subtrace_graph, cycles, eth_lost)
             self.find_call_injection(subtrace_graph, cycles)
             self.find_bonus_hunitng(subtrace_graph)
