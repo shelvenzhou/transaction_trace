@@ -5,6 +5,7 @@ import networkx as nx
 import binascii
 
 from ..local import EthereumDatabase
+from .trace_util import TraceUtil
 
 l = logging.getLogger("transaction-trace.analysis.SubtraceGraph")
 
@@ -273,19 +274,6 @@ class SubtraceGraphAnalyzer:
             self.record_abnormal_detail(
                 graph.graph["date"], ABNORMAL_TYPE, "tx: %s hunting times: %d" % (tx_hash, hunting_times))
 
-    def build_call_tree(self, subtraces):
-        tx_trees = defaultdict(dict)
-        for tx_hash in subtraces:
-            for subtrace in subtraces[tx_hash]:
-                trace_id = subtrace["trace_id"]
-                parent_trace_id = subtrace["parent_trace_id"]
-                if parent_trace_id == None:
-                    tx_trees[tx_hash][-1] = trace_id
-                else:
-                    if parent_trace_id not in tx_trees[tx_hash]:
-                        tx_trees[tx_hash][parent_trace_id] = list()
-                    tx_trees[tx_hash][parent_trace_id].append(trace_id)
-        return tx_trees
 
     def find_all_abnormal_behaviors(self):
         for subtrace_graph, traces, subtraces in self.subtrace_graph.subtrace_graphs_by_tx():
@@ -295,7 +283,7 @@ class SubtraceGraphAnalyzer:
             if "traces" not in self.analysis_cache:
                 self.analysis_cache["traces"] = traces
             if "tx_trees" not in self.analysis_cache:
-                self.analysis_cache["tx_trees"] = self.build_call_tree(
+                self.analysis_cache["tx_trees"] = TraceUtil.build_call_tree(
                     subtraces)
 
             self.find_reentrancy(subtrace_graph, cycles)
