@@ -126,7 +126,7 @@ class SingleTraceDatabase(Database):
         """
         self.insert(
             "subtraces",
-            "transaction_hash, trace_id, parent_trace_id",
+            "",
             "?, ?, ?",
             row
         )
