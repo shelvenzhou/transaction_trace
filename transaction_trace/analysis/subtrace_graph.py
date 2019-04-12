@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 from web3 import Web3
 import networkx as nx
+import binascii
 
 from ..local import EthereumDatabase
 
@@ -104,7 +105,16 @@ key_funcs = {
         "0x095ea7b3": "approve(address,uint256)",
         "0x42842e0e": "safeTransferFrom(address,address,uint256)",
         "0xb88d4fde": "safeTransferFrom(address,address,uint256,bytes)",
+        "0x40c10f19": "mint(address,uint256)",
+        "0xb5e73249": "mint(address,uint256,bool,uint32)",
+        "0xf0dda65c": "mintTokens(address,uint256)",
+        "0x79c65068": "mintToken(address,uint256)",
+        "0x449a52f8": "mintTo(address,uint256)",
+        "0x2f81bc71": "multiMint(address[],uint256[])"
     },
+    "contract": {
+        "0xcbf0b0c0": "kill(address)"
+    }
 }
 
 
@@ -114,7 +124,13 @@ class SubtraceGraphAnalyzer:
         self.log_file = log_file
 
         self.analysis_cache = dict()
-        self.analysis_cache["key_func"] = key_funcs
+        self.analysis_cache["key_funcs"] = dict()
+        for func_type in key_funcs:
+            for func_hash in key_funcs[func_type]:
+                func_name = key_funcs[func_type][func_hash]
+                func_hex = binascii.b2a_hex(func_name.encode("utf-8")).decode()
+                self.analysis_cache["key_funcs"][func_hash] = (
+                    func_name, func_hex)
 
     def record_abnormal_detail(self, date, abnormal_type, detail):
         print("[%s][%s]: %s" %
@@ -151,30 +167,31 @@ class SubtraceGraphAnalyzer:
 
                 parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"]
                 if len(parent_trace_input) > 10 and gas_used > 0:
-                    method_hash = callee
-                    if method_hash[2:] in parent_trace_input[10:]:
-                        func_name = ""
+                    if callee[2:] in parent_trace_input or callee in self.analysis_cache["key_funcs"] and self.analysis_cache["key_funcs"][callee][1] in parent_trace_input:
+                        injection = set()
+                        stack = list()
+                        stack.append(trace_id)
+                        while len(stack) > 0:
+                            s_trace_id = stack.pop()
+                            trace_input = self.analysis_cache["traces"][tx_hash][s_trace_id]["input"]
+                            if len(trace_input) > 9 and trace_input[:10] in self.analysis_cache["key_funcs"]:
+                                injection.add(
+                                    self.analysis_cache["key_funcs"][trace_input[:10]][0])
+                            trace_value = Web3.fromWei(
+                                self.analysis_cache["traces"][tx_hash][s_trace_id]["value"], "ether")
+                            if trace_value > 0:
+                                injection.add("ethTransfer")
+                            if s_trace_id in self.analysis_cache["tx_trees"][tx_hash]:
+                                children = self.analysis_cache["tx_trees"][tx_hash][s_trace_id]
+                                stack.extend(children)
 
-                        if method_hash in self.analysis_cache["key_func"]["owner"]:
-                            func_name = self.analysis_cache["key_func"]["owner"][method_hash]
-                        elif method_hash in self.analysis_cache["key_func"]["token"]:
-                            func_name = self.analysis_cache["key_func"]["token"][method_hash]
-                        injection_type = f"injection type: {func_name} "
-                        if trace_id in self.analysis_cache["tx_trees"][tx_hash]:
-                            childs_traces_id = self.analysis_cache["tx_trees"][tx_hash][trace_id]
-                            for child in childs_traces_id:
-                                eth_value = Web3.fromWei(self.analysis_cache["traces"][tx_hash][child]["value"], "ether")
-                                if eth_value > 0:
-                                    injection_type += f"eth transfer: {eth_value}"
-                                    break
-
-                        if injection_type != None:
+                        if len(injection) > 0:
                             l.info(
-                                "Call injection found for %s with entry %s, %s",
-                                tx_hash, cycle[0], injection_type)
+                                "Call injection found for %s with entry %s, injection type: %s",
+                                tx_hash, cycle[0], injection)
                             self.record_abnormal_detail(
                                 graph.graph["date"], ABNORMAL_TYPE,
-                                "tx: %s entry: %s %s" % (tx_hash, cycle[0], injection_type))
+                                "tx: %s entry: %s type: %s" % (tx_hash, cycle[0], injection))
 
     def count_subtrace_cycle(self, graph, cycle):
         def extract_trace_info(graph, u, v):
