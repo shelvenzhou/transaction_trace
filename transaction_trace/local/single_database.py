@@ -126,7 +126,7 @@ class SingleTraceDatabase(Database):
         """
         self.insert(
             "subtraces",
-            "transaction_hash, trace_id, parent_trace_id",
+            "",
             "?, ?, ?",
             row
         )
@@ -182,7 +182,7 @@ class SingleTransactionDatabase(Database):
     def create_txs_table(self):
         self.create_table(
             table_name="transactions",
-            columns='''(
+            columns='''
                 hash TEXT PRIMARY KEY,
                 nonce INT NOT NULL,
                 transaction_index INT NOT NULL,
@@ -200,7 +200,7 @@ class SingleTransactionDatabase(Database):
                 block_timestamp TIMESTAMP NOT NULL,
                 block_number INT NOT NULL,
                 block_hash TEXT NOT NULL
-            )''')
+            ''')
 
     def insert_txs(self, rows):
         self.insert(
@@ -208,3 +208,32 @@ class SingleTransactionDatabase(Database):
             columns="",
             placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
             rows=rows)
+
+
+class SingleTokenTransferDatabase(Database):
+    def __init__(self, db_filepath, date):
+        super(SingleTokenTransferDatabase, self).__init__(db_filepath, date)
+
+    def create_token_transfers_table(self):
+        self.create_table(
+            table_name="token_transfers",
+            columns='''
+                token_address TEXT NOT NULL,
+                from_address TEXT,
+                to_address TEXT,
+                value TEXT,
+                transaction_hash TEXT NOT NULL,
+                log_index INT NOT NULL,
+                block_timestamp TIMESTAMP NOT NULL,
+                block_number INT NOT NULL,
+                block_hash TEXT NOT NULL,
+                PRIMARY KEY(transaction_hash, log_index)
+            ''')
+
+    def insert_token_transfers(self, rows):
+        self.insert(
+            table="token_transfers",
+            columns="",
+            placeholders="? ,?, ?, ?, ? ,?, ?, ?, ?",
+            rows=rows
+        )

@@ -29,25 +29,29 @@ database_map = {
         "class_name": "SingleTransactionDatabase",
         "create": "create_txs_table",
         "insert": "insert_txs"
+    },
+    "token_transfers": {
+        "class_name": "SingleTokenTransferDatabase",
+        "create": "create_token_transfers_table",
+        "insert": "insert_token_transfers"
     }
 }
 
-
-def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
+def main(db_folder, db_name, crawl_time_path, time_interval, to_time, from_time):
     remote = EthereumBigQuery()
-    db_name = db_folder.split("_")[-1]
     # data insertion
-    try:
-        with open(crawl_time_path, "r") as f:
-            from_time = str_to_time(f.readline())
-    except:
-        if from_time == None:
-            print("from_time not set")
+    if from_time == None:
+        try:
+            with open(crawl_time_path, "r") as f:
+                from_time = str_to_time(f.readline())
+        except:
+            print("crawl-time log not found, from_time need to be set")
             exit(-1)
+    else:
         from_time = str_to_date(from_time)
     t_time = from_time + timedelta(hours=int(time_interval))
 
-    while from_time < str_to_date(to_time):
+    while from_time <= str_to_date(to_time):
         date = from_time.date()
         date_str = date_to_str(date)
         db_filepath = os.path.join(db_folder, db_filename(db_name, date_str))
@@ -66,22 +70,22 @@ def main(db_folder, crawl_time_path, time_interval, to_time, from_time):
             for row in rows:
                 getattr(db, database_map[db_name]["insert"])(row)
                 count += 1
-            print(count, "txs")
+            print(count, "items")
             db.commit()
 
             from_time = t_time
-            t_time += timedelta(hours=1)
+            t_time += timedelta(hours=int(time_interval))
             with open(crawl_time_path, "w+") as f:
                 f.write(time_to_str(from_time))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
-        print("Usage: python3 %s db_folder crawl_time_path time_interval to_time [from_time]" %
+    if len(sys.argv) < 6 or len(sys.argv) > 7:
+        print("Usage: python3 %s db_folder db_name crawl_time_path time_interval to_time [from_time]" %
               sys.argv[0])
         exit(-1)
 
-    if len(sys.argv) == 5:
-        sys.argv[5] = None
+    if len(sys.argv) == 6:
+        sys.argv.append(None)
 
-    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])

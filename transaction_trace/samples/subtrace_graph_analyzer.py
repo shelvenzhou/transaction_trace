@@ -15,7 +15,7 @@ def main(db_folder, from_time, to_time, log_path):
             subtrace_graph_analyzer = SubtraceGraphAnalyzer(
                 subtrace_graph, log_file)
 
-            subtrace_graph_analyzer.find_all_abnormal_behaviors()
+            subtrace_graph_analyzer.find_all_abnormal_behaviors(dict())
 
 
 if __name__ == "__main__":

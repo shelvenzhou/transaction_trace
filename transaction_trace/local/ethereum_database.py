@@ -29,9 +29,9 @@ def db_filename(db_name, date):
 
 class EthereumDatabase:
 
-    def __init__(self, db_folder, cache_capacity=20):
+    def __init__(self, db_folder, db_name="traces", cache_capacity=20):
         self._db_folder = db_folder
-        self._db_name = db_folder.split("_")[-1]
+        self._db_name = db_name
 
         self._data_time_range = data_time_range(db_folder, self._db_name)
 
