@@ -8,4 +8,10 @@ setup(
     python_requires='>=3.5',
     description='Smart contract traffic analysis tool',
     packages=packages,
+    install_requires=[
+        'networkx',
+        'web3',
+        'numpy',
+        'scipy',
+    ],
 )
