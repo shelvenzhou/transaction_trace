@@ -1,7 +1,8 @@
-from scipy.cluster.hierarchy import linkage, fcluster
-from sortedcontainers import SortedDict
 from collections import defaultdict
+
 import numpy as np
+from scipy.cluster.hierarchy import fcluster, linkage
+from sortedcontainers import SortedDict
 
 
 def txs_distance(a, b):

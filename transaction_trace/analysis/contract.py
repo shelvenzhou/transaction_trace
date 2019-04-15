@@ -1,8 +1,8 @@
 import logging
 from collections import defaultdict
 
+from ..datetime_utils import str_to_time, time_to_str
 from ..local import EthereumDatabase
-from ..datetime_utils import time_to_str, str_to_time
 
 l = logging.getLogger("transaction-trace.analysis.ContractAnalyzer")
 

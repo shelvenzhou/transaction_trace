@@ -1,9 +1,10 @@
 import logging
 from collections import defaultdict
-from sortedcontainers import SortedList
 from datetime import timedelta, timezone
 
-from ..datetime_utils import str_to_date, time_to_str, date_to_str
+from sortedcontainers import SortedList
+
+from ..datetime_utils import date_to_str, str_to_date, time_to_str
 from ..local import EthereumDatabase
 
 l = logging.getLogger("transaction-trace.analysis.TrafficAnalyzer")
@@ -54,7 +55,8 @@ class TrafficAnalyzer:
             tx_count = blocks[b_num]["transaction_count"]
             if blocks[b_num]["gas_used"]/blocks[b_num]["gas_limit"] > 0.95 and average > 20 and tx_count < float(t):
                 jammed_blocks.add(b_num)
-                l.info(f"jammed block found on {block_time}, average: {average}, tx_count: {tx_count}, number: {b_num}")
+                l.info(
+                    f"jammed block found on {block_time}, average: {average}, tx_count: {tx_count}, number: {b_num}")
                 self.record_abnormal_detail(
                     block_time, "BLOCKJAM", f"average: {average}, tx_count: {tx_count}, block_number: {b_num}")
 

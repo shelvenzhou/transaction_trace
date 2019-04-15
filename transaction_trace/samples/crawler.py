@@ -1,12 +1,13 @@
 import logging
-from datetime import datetime, timedelta
+import os
 import sqlite3
 import sys
-import os
+from datetime import datetime, timedelta
 
-from transaction_trace.datetime_utils import date_to_str, str_to_time, time_to_str, str_to_date
-from transaction_trace.local.single_database import *
+from transaction_trace.datetime_utils import (date_to_str, str_to_date,
+                                              str_to_time, time_to_str)
 from transaction_trace.local.ethereum_database import db_filename
+from transaction_trace.local.single_database import *
 from transaction_trace.remote.ethereum_bigquery import EthereumBigQuery
 
 l = logging.getLogger("transaction-trace.utilities.crawler")
@@ -37,6 +38,7 @@ database_map = {
     }
 }
 
+
 def main(db_folder, db_name, crawl_time_path, time_interval, to_time, from_time):
     remote = EthereumBigQuery()
     # data insertion
@@ -55,7 +57,8 @@ def main(db_folder, db_name, crawl_time_path, time_interval, to_time, from_time)
         date = from_time.date()
         date_str = date_to_str(date)
         db_filepath = os.path.join(db_folder, db_filename(db_name, date_str))
-        db = globals()[database_map[db_name]["class_name"]](db_filepath, date_str)
+        db = globals()[database_map[db_name]["class_name"]](
+            db_filepath, date_str)
         try:
             getattr(db, database_map[db_name]["create"])()
         except sqlite3.Error as e:
@@ -88,4 +91,5 @@ if __name__ == "__main__":
     if len(sys.argv) == 6:
         sys.argv.append(None)
 
-    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
+    main(sys.argv[1], sys.argv[2], sys.argv[3],
+         sys.argv[4], sys.argv[5], sys.argv[6])

@@ -1,8 +1,9 @@
+import binascii
 import logging
 from collections import defaultdict
-from web3 import Web3
+
 import networkx as nx
-import binascii
+from web3 import Web3
 
 from ..local import EthereumDatabase
 from .trace_util import TraceUtil

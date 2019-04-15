@@ -11,7 +11,6 @@ from .single_database import SingleTraceDatabase
 l = logging.getLogger("transaction-trace.local.ethereum_database")
 
 
-
 def data_time_range(db_folder, db_name):
     prog = re.compile(r"%s_(\d{4}\-\d{2}\-\d{2})\.sqlite3" % db_name)
     dates = SortedList(key=lambda x: str_to_date(x))
@@ -63,7 +62,8 @@ class EthereumDatabase:
             conn = self._connection_cache.pop(lru)
             del conn
 
-        db_filepath = os.path.join(self._db_folder, db_filename(self._db_name, date))
+        db_filepath = os.path.join(
+            self._db_folder, db_filename(self._db_name, date))
         db = SingleTraceDatabase(db_filepath, date)
         self._connection_access.append(date)
         self._connection_cache[date] = db
