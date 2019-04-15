@@ -1,6 +1,6 @@
 from .subtrace import SubtraceBuilder
 from .subtrace_graph import SubtraceGraph, SubtraceGraphAnalyzer
-from .transaction import TransactionAnalyzer
+from .honeypot import Honeypot
 from .cluster import TransactionCluster
-from .trace_util import TraceUtil
-from .contract import Contract
+from .traffic import TrafficAnalyzer
+from .call_after_destruct import CallAfterDestruct

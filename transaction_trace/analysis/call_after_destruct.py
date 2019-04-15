@@ -2,19 +2,14 @@ import logging
 from collections import defaultdict
 
 from ..datetime_utils import str_to_time, time_to_str
-from ..local import EthereumDatabase
+from .trace_analysis import TraceAnalysis
 
-l = logging.getLogger("transaction-trace.analysis.ContractAnalyzer")
+l = logging.getLogger("transaction-trace.analysis.CallAfterDestruct")
 
 
-class Contract:
+class CallAfterDestruct(TraceAnalysis):
     def __init__(self, db_folder, log_file):
-        self.database = EthereumDatabase(db_folder)
-        self.log_file = log_file
-
-    def record_abnormal_detail(self, date, abnormal_type, detail):
-        print("[%s][%s]: %s" %
-              (date, abnormal_type, detail), file=self.log_file)
+        super(CallAfterDestruct, self).__init__(db_folder, log_file)
 
     def find_call_after_destruct(self, from_time, to_time):
         ABNORMAL_TYPE = "CallAfterDestruct"

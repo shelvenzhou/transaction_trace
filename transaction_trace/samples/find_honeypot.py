@@ -3,12 +3,12 @@ import sys
 import time
 
 import transaction_trace
-from transaction_trace.analysis import TransactionAnalyzer
+from transaction_trace.analysis import Honeypot
 
 
 def main(db_folder, from_time, to_time, log_path):
-    with open(os.path.join(log_path, "transaction-analyzer-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+") as log_file:
-        analyzer = TransactionAnalyzer(db_folder, log_file)
+    with open(os.path.join(log_path, "honeypot-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+") as log_file:
+        analyzer = Honeypot(db_folder, log_file)
         analyzer.find_honeypot(from_time, to_time)
 
 

@@ -3,19 +3,14 @@ from collections import defaultdict
 from datetime import timedelta, timezone
 
 from ..datetime_utils import str_to_date, time_to_str
-from ..local import EthereumDatabase
+from .trace_analysis import TraceAnalysis
 
-l = logging.getLogger("transaction-trace.analysis.TransactionAnalyzer")
+l = logging.getLogger("transaction-trace.analysis.Honeypot")
 
 
-class TransactionAnalyzer:
+class Honeypot(TraceAnalysis):
     def __init__(self, db_folder, log_file):
-        self.database = EthereumDatabase(db_folder)
-        self.log_file = log_file
-
-    def record_abnormal_detail(self, date, abnormal_type, detail):
-        print("[%s][%s]: %s" %
-              (date, abnormal_type, detail), file=self.log_file)
+        super(Honeypot, self).__init__(db_folder, log_file)
 
     def find_honeypot(self, from_time, to_time,
                       # 1 ETH <= bonus <= 10 ETH

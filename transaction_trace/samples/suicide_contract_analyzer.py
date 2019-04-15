@@ -2,12 +2,12 @@ import os
 import sys
 import time
 
-from transaction_trace.analysis.contract import Contract
+from transaction_trace.analysis import CallAfterDestruct
 
 
 def main(db_folder, from_time, to_time, log_path):
     with open(os.path.join(log_path, "suicide-contract-analyzer-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+") as log_file:
-        contract_analyzer = Contract(db_folder, log_file)
+        contract_analyzer = CallAfterDestruct(db_folder, log_file)
         contract_analyzer.find_call_after_destruct(from_time, to_time)
 
 
