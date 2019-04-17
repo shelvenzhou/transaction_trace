@@ -18,9 +18,8 @@ class SubtraceGraph:
     def _subtrace_graph_by_tx(self, tx_hash, subtraces, traces):
         subtrace_graph = nx.DiGraph(
             transaction_hash=tx_hash, date=self._db_conn.date)
-        for subtrace in subtraces:
-            trace_id = subtrace["trace_id"]
-            parent_trace_id = subtrace["parent_trace_id"]
+        for trace_id in subtraces:
+            parent_trace_id = subtraces[trace_id]
 
             trace = traces[trace_id]
             if trace["status"] == 0:
@@ -61,10 +60,12 @@ class SubtraceGraph:
             rowid = row["rowid"]
             traces[tx_hash][rowid] = row
 
-        subtraces = defaultdict(list)
+        subtraces = defaultdict(dict)
         for row in self._db_conn.read_subtraces():
             tx_hash = row["transaction_hash"]
-            subtraces[tx_hash].append(row)
+            trace_id = row["trace_id"]
+            parent_trace_id = row["parent_trace_id"]
+            subtraces[tx_hash][trace_id] = parent_trace_id
 
         l.info("Begin graph construction")
         for tx_hash in traces:
@@ -127,9 +128,9 @@ class SubtraceGraphAnalyzer:
                 self.analysis_cache["key_funcs"][func_hash] = (
                     func_name, func_hex)
 
-    def record_abnormal_detail(self, date, abnormal_type, detail):
-        print("[%s][%s]: %s" %
-              (date, abnormal_type, detail), file=self.log_file)
+    def record_abnormal_detail(self, detail):
+        # json.dump(detail, self.log_file)
+        print(detail, file=self.log_file)
 
     def get_edges_from_cycle(self, cycle):
         edges = list()
@@ -138,12 +139,13 @@ class SubtraceGraphAnalyzer:
         edges.append((cycle[-1], cycle[0]))
         return edges
 
-    def find_call_injection(self, graph, cycles, key_func: bool=True):
+    def find_call_injection(self, graph, cycles, key_func: bool = True):
         ABNORMAL_TYPE = "CallInjection"
 
         l.debug("Searching for Call Injection")
 
         tx_hash = graph.graph["transaction_hash"]
+        detail_list = set()
         for cycle in cycles:
             # call injection has to call another method in the same contract
             # which forms self-loop in our graph
@@ -157,65 +159,86 @@ class SubtraceGraphAnalyzer:
                 gas_used = call_trace["gas_used"]
                 callee = call_trace["callee"]
                 caller_address = self.analysis_cache["traces"][tx_hash][parent_trace_id]["from_address"]
+                call_type = self.analysis_cache["traces"][tx_hash][trace_id]["call_type"]
+                if call_type == "delegatecall":
+                    continue
 
                 if parent_trace_id == None or gas_used == None or not callee.startswith("0x"):
                     continue
-
-                injection = self._find_call_injection(
-                    tx_hash, trace_id, parent_trace_id, key_func)
+                callee = TraceUtil.get_callee(
+                    self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
+                parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"][10:]
+                injection = list(self._find_call_injection(
+                    tx_hash, trace_id, parent_trace_input, callee, key_func))
 
                 if len(injection) > 0:
                     l.info(
-                        "Call injection found for %s with entry %s caller %s injection type: %s",
-                        tx_hash, cycle[0], caller_address, injection)
-                    self.record_abnormal_detail(
-                        graph.graph["date"], ABNORMAL_TYPE,
-                        "tx: %s entry: %s caller: %s type: %s" % (tx_hash, cycle[0], caller_address, injection))
+                        "Call injection found for %s with entry %s behavior: %s",
+                        tx_hash, cycle[0], injection)
+                    detail = {
+                        "date": graph.graph["date"],
+                        "abnormal_type": ABNORMAL_TYPE,
+                        "tx_hash": tx_hash,
+                        "entry": cycle[0],
+                        "caller": caller_address,
+                        "call_type": call_type,
+                        "func": callee,
+                        "behavior": injection
+                    }
+                    detail_list.add(str(detail))
 
-            # check call injection on delegate call
-            for subtrace in self.analysis_cache["subtraces"][tx_hash]:
-                trace_id = subtrace["trace_id"]
-                parent_trace_id = subtrace["parent_trace_id"]
-                trace_type = self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"]
-                call_type = self.analysis_cache["traces"][tx_hash][trace_id]["call_type"]
-                status = self.analysis_cache["traces"][tx_hash][trace_id]["status"]
-                if status == 1 and trace_type == "call" and call_type == "delegatecall":
-                    callee = TraceUtil.get_callee(
-                        trace_type, self.analysis_cache["traces"][tx_hash][trace_id]["input"])
-                    while parent_trace_id != None:
-                        parent_trace_type = self.analysis_cache["traces"][tx_hash][parent_trace_id]["trace_type"]
-                        parent_call_type = self.analysis_cache["traces"][tx_hash][parent_trace_id]["call_type"]
-                        if parent_trace_type == "call" and parent_call_type == "delegatecall":
-                            parent_trace_id = self.analysis_cache["subtraces"][
-                                tx_hash][parent_trace_id]["parent_trace_id"]
-                        else:
-                            break
+        # check call injection on delegate call
+        for trace_id in self.analysis_cache["subtraces"][tx_hash]:
+            parent_trace_id = self.analysis_cache["subtraces"][tx_hash][trace_id]
+            trace_type = self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"]
+            call_type = self.analysis_cache["traces"][tx_hash][trace_id]["call_type"]
+            status = self.analysis_cache["traces"][tx_hash][trace_id]["status"]
+            from_address = self.analysis_cache["traces"][tx_hash][trace_id]["from_address"]
+            to_address = self.analysis_cache["traces"][tx_hash][trace_id]["to_address"]
+            if status == 1 and trace_type == "call" and (call_type == "delegatecall" and from_address != to_address or call_type == "callcode"):
+                callee = TraceUtil.get_callee(
+                    trace_type, self.analysis_cache["traces"][tx_hash][trace_id]["input"])
+                while parent_trace_id != None:
+                    parent_trace_type = self.analysis_cache["traces"][tx_hash][parent_trace_id]["trace_type"]
+                    parent_call_type = self.analysis_cache["traces"][tx_hash][parent_trace_id]["call_type"]
+                    if parent_trace_type == "call" and (parent_call_type == "delegatecall" or parent_call_type == "callcode"):
+                        parent_trace_id = self.analysis_cache["subtraces"][tx_hash][parent_trace_id]
+                    else:
+                        break
 
-                    injection = self._find_call_injection(
-                        tx_hash, trace_id, parent_trace_id, key_func)
+                callee = TraceUtil.get_callee(
+                    self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
+                parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"]
+                injection = list(self._find_call_injection(
+                    tx_hash, trace_id, parent_trace_input, callee, key_func))
 
-                    if len(injection) > 0:
-                        entry = self.analysis_cache["traces"][tx_hash][parent_trace_id]["to_address"]
-                        caller_address = self.analysis_cache["traces"][tx_hash][parent_trace_id]["from_address"]
-                        l.info(
-                            "Call injection found for %s with entry %s caller %s injection type: %s",
-                            tx_hash, cycle[0], caller_address, injection)
-                        self.record_abnormal_detail(
-                            graph.graph["date"], ABNORMAL_TYPE,
-                            "tx: %s entry: %s caller: %s type: %s" % (tx_hash, cycle[0], caller_address, injection))
+                if len(injection) > 0:
+                    entry = self.analysis_cache["traces"][tx_hash][parent_trace_id]["to_address"]
+                    caller_address = self.analysis_cache["traces"][tx_hash][parent_trace_id]["from_address"]
+                    l.info(
+                        "Call injection found for %s with entry %s behavior: %s",
+                        tx_hash, entry, injection)
+                    detail = {
+                        "date": graph.graph["date"],
+                        "abnormal_type": ABNORMAL_TYPE,
+                        "tx_hash": tx_hash,
+                        "entry": entry,
+                        "caller": caller_address,
+                        "call_type": call_type,
+                        "func": callee,
+                        "behavior": injection
+                    }
+                    detail_list.add(str(detail))
 
-    def _find_call_injection(self, tx_hash, trace_id, parent_trace_id, key_func: bool):
+        for detail in detail_list:
+            self.record_abnormal_detail(detail)
+
+    def _find_call_injection(self, tx_hash, trace_id, parent_trace_input, callee, key_func: bool):
         injection = set()
-        if parent_trace_id == None:
-            return injection
-        callee = TraceUtil.get_callee(
-            self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
-        parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"]
-
         if len(parent_trace_input) > 10:
             if callee[2:] in parent_trace_input or callee in self.analysis_cache["key_funcs"] and self.analysis_cache["key_funcs"][callee][1] in parent_trace_input:
                 if not key_func:
-                    injection.add(callee)
+                    injection.add(None)
                 else:
                     stack = list()
                     stack.append(trace_id)
@@ -293,9 +316,14 @@ class SubtraceGraphAnalyzer:
             if cycle_count > 5:
                 l.info("Reentrancy found for %s with cycle count %d",
                        tx_hash, cycle_count)
-                self.record_abnormal_detail(
-                    graph.graph["date"], ABNORMAL_TYPE, "tx: %s cycle count: %d cycle nodes: %s" %
-                    (tx_hash, cycle_count, cycle))
+                detail = {
+                    "date": graph.graph["date"],
+                    "abnormal_type": ABNORMAL_TYPE,
+                    "tx_hash": tx_hash,
+                    "cycle_count": cycle_count,
+                    "cycle_nodes": cycle
+                }
+                self.record_abnormal_detail(detail)
                 f = True
         if f and eth != None:
             eth_transfer = defaultdict(lambda: defaultdict(int))
@@ -319,8 +347,13 @@ class SubtraceGraphAnalyzer:
                 if eth[tx_hash][node] < lost:
                     lost = eth[tx_hash][node]
             l.info("Reentrancy eth lost for %s: %d", tx_hash, lost)
-            self.record_abnormal_detail(
-                graph.graph["date"], ABNORMAL_TYPE, "tx: %s eth lost: %d" % (tx_hash, lost))
+            detail = {
+                "date": graph.graph["date"],
+                "abnormal_type": ABNORMAL_TYPE,
+                "tx_hash": tx_hash,
+                "eth_lost": lost
+            }
+            self.record_abnormal_detail(detail)
 
     def find_bonus_hunitng(self, graph):
         ABNORMAL_TYPE = "BonusHunting"
@@ -340,8 +373,13 @@ class SubtraceGraphAnalyzer:
         if hunting_times > 5:
             l.info("Bonus hunting found for %s with hunting times %d",
                    tx_hash, hunting_times)
-            self.record_abnormal_detail(
-                graph.graph["date"], ABNORMAL_TYPE, "tx: %s hunting times: %d" % (tx_hash, hunting_times))
+            detail = {
+                "date": graph.graph["date"],
+                "abnormal_type": ABNORMAL_TYPE,
+                "tx_hash": tx_hash,
+                "hunting_times": hunting_times
+            }
+            self.record_abnormal_detail(detail)
 
     def find_all_abnormal_behaviors(self, eth_lost=None):
         for subtrace_graph, traces, subtraces in self.subtrace_graph.subtrace_graphs_by_tx():

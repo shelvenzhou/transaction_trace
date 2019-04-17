@@ -17,9 +17,8 @@ class TraceUtil:
     def build_call_tree(subtraces):
         tx_trees = defaultdict(dict)
         for tx_hash in subtraces:
-            for subtrace in subtraces[tx_hash]:
-                trace_id = subtrace["trace_id"]
-                parent_trace_id = subtrace["parent_trace_id"]
+            for trace_id in subtraces[tx_hash]:
+                parent_trace_id = subtraces[tx_hash][trace_id]
                 if parent_trace_id == None:
                     tx_trees[tx_hash][-1] = trace_id
                 else:
@@ -60,12 +59,12 @@ class TraceUtil:
         path_sigs = set()
         for path in tx_paths[tx_hash]:
             if specified_trace_id == None or specified_trace_id in path:
-                subtraces = []
+                straces = []
                 for trace_id in path:
                     from_address = traces[tx_hash][trace_id]["from_address"]
                     to_address = traces[tx_hash][trace_id]["to_address"]
                     callee = TraceUtil.get_callee(traces[tx_hash][trace_id]['trace_type'], traces[tx_hash][trace_id]['input'])
-                    subtraces.append((from_address, to_address, callee))
-                subtrace_hash = TraceUtil.hash_subtraces(subtraces)
+                    straces.append((from_address, to_address, callee))
+                subtrace_hash = TraceUtil.hash_subtraces(straces)
                 path_sigs.add(subtrace_hash)
         return path_sigs
