@@ -2,27 +2,42 @@ import os
 import sys
 import time
 from collections import defaultdict
+import logging
 
 from transaction_trace.local.ethereum_database import EthereumDatabase
+from transaction_trace.analysis.trace_util import TraceUtil
 
 
 def main(db_folder, from_time, to_time, log_file):
-    call_injection = defaultdict(set)
+    call_injection = defaultdict(dict)
+
     with open(log_file, "r") as f:
+        print("analyzing log...")
         for line in f.readlines():
-            if "CallInjection" in line:
-                entry_pos = line.find("entry")
-                entry = line[entry_pos + 7: entry_pos + 49]
-                func_pos = line.find("func")
-                func = line[func_pos + 6: func_pos + 16]
-                call_injection[entry].add(func)
+            one = eval(line.strip("\n"))
+            if one["abnormal_type"] == "CallInjection":
+                call_injection[one["entry"]][one["parent_func"]] = False
 
     log_path = log_file.strip(log_file.split("/")[-1])
     with open(os.path.join(log_path, "failed-call-injection-analyzer-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+") as log_file:
         db = EthereumDatabase(db_folder)
         for db_conn in db.get_connections(from_time, to_time):
-            pass
-
+            traces = db_conn.read_traces(True)
+            subtraces = defaultdict(dict)
+            for row in db_conn.read_subtraces():
+                tx_hash = row["transaction_hash"]
+                trace_id = row["trace_id"]
+                parent_trace_id = row["parent_trace_id"]
+                subtraces[tx_hash][trace_id] = parent_trace_id
+            trees = TraceUtil.build_call_tree(subtraces)
+            for trace in traces:
+                tx_hash = trace["transaction_hash"]
+                if trace["error"] == "Reverted" or trace["rowid"] not in trees[tx_hash]:
+                    func = TraceUtil.get_callee(trace["trace_type"], trace["input"])
+                    if trace["to_address"] in call_injection and func in call_injection[trace["to_address"]]:
+                        print("tx_hash %s to_address %s func %s" % (tx_hash, trace["to_address"], func))
+                        call_injection[trace["to_address"]][func] = True
+    import IPython;IPython.embed()
 
 if __name__ == "__main__":
     if len(sys.argv) != 5:

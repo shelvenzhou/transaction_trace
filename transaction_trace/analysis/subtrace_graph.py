@@ -183,6 +183,7 @@ class SubtraceGraphAnalyzer:
                         "caller": caller_address,
                         "call_type": call_type,
                         "func": callee,
+                        "parent_func": TraceUtil.get_callee(self.analysis_cache["traces"][tx_hash][parent_trace_id]["trace_type"], parent_trace_input),
                         "behavior": injection
                     }
                     detail_list.add(str(detail))
@@ -226,6 +227,7 @@ class SubtraceGraphAnalyzer:
                         "caller": caller_address,
                         "call_type": call_type,
                         "func": callee,
+                        "parent_func": TraceUtil.get_callee(parent_trace_type, parent_trace_input),
                         "behavior": injection
                     }
                     detail_list.add(str(detail))

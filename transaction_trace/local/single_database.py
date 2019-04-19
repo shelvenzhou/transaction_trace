@@ -41,6 +41,7 @@ def tz_aware_timestamp_adapter(val):
 
 sqlite3.register_converter('timestamp', tz_aware_timestamp_adapter)
 sqlite3.register_adapter(decimal.Decimal, adapt_decimal)
+sqlite3.register_adapter(list, lambda x: str(x))
 
 
 class SingleTraceDatabase(Database):
@@ -235,5 +236,33 @@ class SingleTokenTransferDatabase(Database):
             table="token_transfers",
             columns="",
             placeholders="? ,?, ?, ?, ? ,?, ?, ?, ?",
+            rows=rows
+        )
+
+
+class SingleContractDatabase(Database):
+    def __init__(self, db_filepath, date):
+        return super(SingleContractDatabase, self).__init__(db_filepath, date)
+
+    def create_contracts_table(self):
+        self.create_table(
+            table_name="contracts",
+            columns='''
+                address TEXT PRIMARY KEY,
+                bytecode TEXT,
+                function_sighashes LIST,
+                is_erc20 BOOLEAN,
+                is_erc721 BOOLEAN,
+                block_timestamp TIMESTAMP NOT NULL,
+                block_number INT NOT NULL,
+                block_hash TEXT NOT NULL
+            '''
+        )
+
+    def insert_contracts(self, rows):
+        self.insert(
+            table="contracts",
+            columns="",
+            placeholders="?, ?, ?, ?, ?, ?, ?, ?",
             rows=rows
         )
