@@ -9,6 +9,7 @@ setup(
     description='Smart contract traffic analysis tool',
     packages=packages,
     install_requires=[
+        'sortedcontainers',
         'networkx',
         'web3',
         'numpy',
