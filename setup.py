@@ -14,5 +14,6 @@ setup(
         'web3',
         'numpy',
         'scipy',
+        'py-etherscan-api',
     ],
 )
