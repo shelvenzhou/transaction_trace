@@ -34,9 +34,13 @@ class CallAfterDestruct(TraceAnalysis):
                     }
                     l.info("CallAfterDestruct found for contract: %s death time: %s call time: %s",
                            row["to_address"], call_after_destruct[row["to_address"]]["death_time"], call_after_destruct[row["to_address"]]["call_time"])
-                    self.record_abnormal_detail(db_conn.date, ABNORMAL_TYPE, "contract: %s death time: %s death tx: %s call time: %s call tx: %s" % (
-                        row["to_address"],
-                        call_after_destruct[row["to_address"]]["death_time"],
-                        call_after_destruct[row["to_address"]]["death_tx"],
-                        call_after_destruct[row["to_address"]]["call_time"],
-                        call_after_destruct[row["to_address"]]["call_tx"]))
+                    detail = {
+                        "date": db_conn.date,
+                        "abnormal_type": ABNORMAL_TYPE,
+                        "contract": row["to_address"],
+                        "death time": call_after_destruct[row["to_address"]]["death_time"],
+                        "death tx": call_after_destruct[row["to_address"]]["death_tx"],
+                        "call time": call_after_destruct[row["to_address"]]["call_time"],
+                        "call tx": call_after_destruct[row["to_address"]]["call_tx"]
+                    }
+                    self.record_abnormal_detail(detail)

@@ -129,7 +129,6 @@ class SubtraceGraphAnalyzer:
                     func_name, func_hex)
 
     def record_abnormal_detail(self, detail):
-        # json.dump(detail, self.log_file)
         print(detail, file=self.log_file)
 
     def get_edges_from_cycle(self, cycle):
