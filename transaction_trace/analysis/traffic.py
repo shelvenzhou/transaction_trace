@@ -52,8 +52,14 @@ class TrafficAnalyzer(TraceAnalysis):
                 jammed_blocks.add(b_num)
                 l.info(
                     f"jammed block found on {block_time}, average: {average}, tx_count: {tx_count}, number: {b_num}")
-                self.record_abnormal_detail(
-                    block_time, "BLOCKJAM", f"average: {average}, tx_count: {tx_count}, block_number: {b_num}")
+                detail = {
+                    "date": block_time,
+                    "abnormal_type": "BLOCKJAM",
+                    "average": average,
+                    "tx_count": tx_count,
+                    "block_number": b_num
+                }
+                self.record_abnormal_detail(detail)
 
         import IPython
         IPython.embed()

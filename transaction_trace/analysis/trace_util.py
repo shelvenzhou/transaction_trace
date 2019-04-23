@@ -3,12 +3,22 @@ from collections import defaultdict
 
 class TraceUtil:
     @staticmethod
+    def get_callee(trace_type, trace_input):
+        if trace_type == 'call':
+            if len(trace_input) > 9:
+                callee = trace_input[:10]
+            else:
+                callee = 'fallback'
+        else:
+            callee = trace_type
+        return callee
+
+    @staticmethod
     def build_call_tree(subtraces):
         tx_trees = defaultdict(dict)
         for tx_hash in subtraces:
-            for subtrace in subtraces[tx_hash]:
-                trace_id = subtrace["trace_id"]
-                parent_trace_id = subtrace["parent_trace_id"]
+            for trace_id in subtraces[tx_hash]:
+                parent_trace_id = subtraces[tx_hash][trace_id]
                 if parent_trace_id == None:
                     tx_trees[tx_hash][-1] = trace_id
                 else:
@@ -49,19 +59,12 @@ class TraceUtil:
         path_sigs = set()
         for path in tx_paths[tx_hash]:
             if specified_trace_id == None or specified_trace_id in path:
-                subtraces = []
+                straces = []
                 for trace_id in path:
                     from_address = traces[tx_hash][trace_id]["from_address"]
                     to_address = traces[tx_hash][trace_id]["to_address"]
-                    if traces[tx_hash][trace_id]['trace_type'] == 'call':
-                        trace_input = traces[tx_hash][trace_id]['input']
-                        if len(trace_input) > 9:
-                            attr = trace_input[:10]
-                        else:
-                            attr = 'fallback'
-                    else:
-                        attr = traces[tx_hash][trace_id]['trace_type']
-                    subtraces.append((from_address, to_address, attr))
-                subtrace_hash = self.hash_subtraces(subtraces)
+                    callee = TraceUtil.get_callee(traces[tx_hash][trace_id]['trace_type'], traces[tx_hash][trace_id]['input'])
+                    straces.append((from_address, to_address, callee))
+                subtrace_hash = TraceUtil.hash_subtraces(straces)
                 path_sigs.add(subtrace_hash)
         return path_sigs

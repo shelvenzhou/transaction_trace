@@ -35,6 +35,11 @@ database_map = {
         "class_name": "SingleTokenTransferDatabase",
         "create": "create_token_transfers_table",
         "insert": "insert_token_transfers"
+    },
+    "contracts": {
+        "class_name": "SingleContractDatabase",
+        "create": "create_contracts_table",
+        "insert": "insert_contracts"
     }
 }
 
