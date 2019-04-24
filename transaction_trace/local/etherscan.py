@@ -45,6 +45,7 @@ class Etherscan(Database):
         contract = Contract(address=addr, api_key=self.key).get_sourcecode()[0]
         contract['ContractAddress'] = addr
 
-        self.insert_contract([contract[x] for x in key_order])
+        self.insert_contract([contract[x] for x in Etherscan.key_order])
+        self.commit()
 
         return contract
