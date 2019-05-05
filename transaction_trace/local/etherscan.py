@@ -1,6 +1,6 @@
 import json
 
-from etherscan.contracts import Contract
+from aioetherscan import Client
 
 from .database import Database
 
@@ -13,7 +13,12 @@ class Etherscan(Database):
         super(Etherscan, self).__init__(db_filepath, date)
 
         with open(api_key_filepath, 'r') as key_file:
-            self.key = json.loads(key_file.read())['key']
+            key = json.loads(key_file.read())['key']
+
+        self.client = Client(key)
+
+    def __del__(self):
+        self.client.close()
 
     def create_contracts_table(self):
         cur = self._conn.cursor()
@@ -38,11 +43,11 @@ class Etherscan(Database):
     def read_contract(self, addr):
         return self.read("contracts", "*", "WHERE ContractAddress=?", (addr,))
 
-    def get_contract_info(self, addr):
+    async def get_contract_info(self, addr):
         for local_record in self.read_contract(addr):
             return local_record
 
-        contract = Contract(address=addr, api_key=self.key).get_sourcecode()[0]
+        contract = await self.client.contract.contract_source_code(addr)[0]
         contract['ContractAddress'] = addr
 
         self.insert_contract([contract[x] for x in Etherscan.key_order])
