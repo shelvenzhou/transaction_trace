@@ -13,7 +13,7 @@ def main():
 
     for contract_addr in tree.xpath(address_xpath):
         print(contract_addr)
-    # import IPython; IPython.embed()
+    import IPython; IPython.embed()
 
 
 if __name__ == "__main__":

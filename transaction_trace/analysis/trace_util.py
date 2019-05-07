@@ -1,4 +1,5 @@
 from collections import defaultdict
+from hashlib import sha256
 
 
 class TraceUtil:
@@ -64,6 +65,24 @@ class TraceUtil:
                 back_step.append(1)
             back_step.pop()
         return paths
+
+    @staticmethod
+    def hash_subtraces(self, subtraces):
+        address_map = {}
+        symbolic_subtraces = []
+        for subtrace in subtraces:
+            symbolic_subtrace = []
+            for i in range(0, 2):
+                if subtrace[i] in address_map.keys():
+                    symbolic_subtrace.append(address_map[subtrace[i]])
+                else:
+                    symbol = len(address_map.keys())
+                    address_map[subtrace[i]] = symbol
+                    symbolic_subtrace.append(symbol)
+            symbolic_subtrace.append(subtrace[2])
+            symbolic_subtraces.append(symbolic_subtrace)
+        m = hashlib.sha256(str(symbolic_subtraces).encode('utf-8'))
+        return '0x' + m.hexdigest()
 
     @staticmethod
     def generate_path_signature_for_tx(tx_hash, traces, tx_paths, specified_trace_id=None):

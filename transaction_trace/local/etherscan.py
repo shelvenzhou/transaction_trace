@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 from aioetherscan import Client
 
@@ -37,20 +38,23 @@ class Etherscan(Database):
             );
         """)
 
-    def insert_contract(self, row):
-        self.insert("contracts", "", "?, ?, ?, ?, ?, ?, ?, ?, ?, ?", row)
+    async def insert_contract(self, row):
+        try:
+            self.insert("contracts", "", "?, ?, ?, ?, ?, ?, ?, ?, ?, ?", row)
+        except sqlite3.Error as e:
+            print(e)
+
+        self.commit()
 
     def read_contract(self, addr):
         return self.read("contracts", "*", "WHERE ContractAddress=?", (addr,))
 
     async def get_contract_info(self, addr):
-        for local_record in self.read_contract(addr):
-            return local_record
-
-        contract = await self.client.contract.contract_source_code(addr)[0]
+        try:
+            contract = (await self.client.contract.contract_source_code(addr))[0]
+        except Exception as e:
+            print(e)
+            return
         contract['ContractAddress'] = addr
 
-        self.insert_contract([contract[x] for x in Etherscan.key_order])
-        self.commit()
-
-        return contract
+        await self.insert_contract([contract[x] for x in Etherscan.key_order])
