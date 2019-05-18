@@ -81,35 +81,36 @@ class SubtraceGraph:
 
 key_funcs = {
     "owner": {
-        "0x13af4035": "setOwner(address)",
-        "0xe46dcfeb": "initWallet(address[],uint256,uint256)",
-        "0xf2fde38b": "transferOwnership(address)",
-        "0xf1739cae": "transferProxyOwnership(address)",
-        "0x9965b3d6": "claimProxyOwnership()",
-        "0xf00d4b5d": "changeOwner(address,address)",
-        "0x7065cb48": "addOwner(address)",
-        "0xc57c5f60": "initMultiowned(address[],uint256)",
-        "0x1b580620": "setOwner1(address)",
-        "0x5825884f": "setOwner2(address)",
-        "0xe20056e6": "replaceOwner(address,address)",
-        "0x0952c504": "requestOwnershipTransfer(address)",
-        "0x2877a49c": "AddOwnership(address)",
-        "0x4f60f334": "multiAccessAddOwner(address)",
-        "0x880cdc31": "updateOwner(address)",
-        "0x85952454": "newOwner(address)",
+        "0x13af4035": ("setOwner(address)", 34),
+        "0xe46dcfeb": ("initWallet(address[],uint256,uint256)", 290),
+        "0xf2fde38b": ("transferOwnership(address)", 34),
+        "0xf1739cae": ("transferProxyOwnership(address)", 34),
+        "0xa6f9dae1": ("changeOwner(address)", 34),
+        "0x2af4c31e": ("changeOwnership(address)", 34),
+        "0x7065cb48": ("addOwner(address)", 34),
+        "0xc57c5f60": ("initMultiowned(address[],uint256)", 290),
+        "0x1b580620": ("setOwner1(address)", 34),
+        "0x5825884f": ("setOwner2(address)", 34),
+        "0xa39a45b7": ("replaceOwner(address)", 34),
+        "0xe20056e6": ("replaceOwner(address,address)", 98),
+        "0x0952c504": ("requestOwnershipTransfer(address)", 34),
+        "0x2877a49c": ("AddOwnership(address)", 34),
+        "0x4f60f334": ("multiAccessAddOwner(address)", 34),
+        "0x880cdc31": ("updateOwner(address)", 34),
+        "0x85952454": ("newOwner(address)", 34),
     },
     "token": {
-        "0xa9059cbb": "transfer(address,uint256)",
-        "0x23b872dd": "transferFrom(address,address,uint256)",
-        "0x095ea7b3": "approve(address,uint256)",
-        "0x42842e0e": "safeTransferFrom(address,address,uint256)",
-        "0xb88d4fde": "safeTransferFrom(address,address,uint256,bytes)",
-        "0x40c10f19": "mint(address,uint256)",
-        "0xb5e73249": "mint(address,uint256,bool,uint32)",
-        "0xf0dda65c": "mintTokens(address,uint256)",
-        "0x79c65068": "mintToken(address,uint256)",
-        "0x449a52f8": "mintTo(address,uint256)",
-        "0x2f81bc71": "multiMint(address[],uint256[])"
+        "0xa9059cbb": ("transfer(address,uint256)", 34),
+        "0x23b872dd": ("transferFrom(address,address,uint256)", 98),
+        "0x095ea7b3": ("approve(address,uint256)", 34),
+        "0x42842e0e": ("safeTransferFrom(address,address,uint256)", 98),
+        "0xb88d4fde": ("safeTransferFrom(address,address,uint256,bytes)", 98),
+        "0x40c10f19": ("mint(address,uint256)", 34),
+        "0xb5e73249": ("mint(address,uint256,bool,uint32)", 34),
+        "0xf0dda65c": ("mintTokens(address,uint256)", 34),
+        "0x79c65068": ("mintToken(address,uint256)", 34),
+        "0x449a52f8": ("mintTo(address,uint256)", 34),
+        "0x2f81bc71": ("multiMint(address[],uint256[])", 226)
     }
 }
 
@@ -123,10 +124,11 @@ class SubtraceGraphAnalyzer:
         self.analysis_cache["key_funcs"] = dict()
         for func_type in key_funcs:
             for func_hash in key_funcs[func_type]:
-                func_name = key_funcs[func_type][func_hash]
+                func_name = key_funcs[func_type][func_hash][0]
+                benefit_pos = key_funcs[func_type][func_hash][1]
                 func_hex = binascii.b2a_hex(func_name.encode("utf-8")).decode()
                 self.analysis_cache["key_funcs"][func_hash] = (
-                    func_name, func_hex)
+                    func_name, func_hex, benefit_pos)
 
     def record_abnormal_detail(self, detail):
         print(detail, file=self.log_file)
@@ -247,15 +249,30 @@ class SubtraceGraphAnalyzer:
                         s_trace_id = stack.pop()
                         trace_input = self.analysis_cache["traces"][tx_hash][s_trace_id]["input"]
                         trace_type = self.analysis_cache["traces"][tx_hash][s_trace_id]["trace_type"]
+                        to_address = self.analysis_cache["traces"][tx_hash][s_trace_id]["to_address"]
+                        ancestors = None
                         if trace_type == "suicide":
-                            injection.add("suicide")
+                            ancestors = TraceUtil.get_all_ancestors(
+                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
+                            if to_address in ancestors:
+                                injection.add("suicide")
                         elif trace_type == "call" and len(trace_input) > 9 and trace_input[:10] in self.analysis_cache["key_funcs"]:
-                            injection.add(
-                                self.analysis_cache["key_funcs"][trace_input[:10]][0])
+                            ancestors = TraceUtil.get_all_ancestors(
+                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
+                            benefit_pos = self.analysis_cache["key_funcs"][trace_input[:10]][2]
+                            benefit_node = "0x" + \
+                                trace_input[benefit_pos: benefit_pos + 40]
+                            if benefit_node in ancestors:
+                                injection.add(
+                                    self.analysis_cache["key_funcs"][trace_input[:10]][0])
                         trace_value = Web3.fromWei(
                             self.analysis_cache["traces"][tx_hash][s_trace_id]["value"], "ether")
                         if trace_value > 0:
-                            injection.add("ethTransfer")
+                            if ancestors == None:
+                                ancestors = TraceUtil.get_all_ancestors(
+                                    self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
+                            if to_address in ancestors:
+                                injection.add("ethTransfer")
                         if s_trace_id in self.analysis_cache["tx_trees"][tx_hash]:
                             children = self.analysis_cache["tx_trees"][tx_hash][s_trace_id]
                             stack.extend(children)

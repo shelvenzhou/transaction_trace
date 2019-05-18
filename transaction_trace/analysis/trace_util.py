@@ -28,6 +28,18 @@ class TraceUtil:
         return tx_trees
 
     @staticmethod
+    def get_all_ancestors(traces, subtraces, trace_id):
+        ancestors = list()
+        parent_trace_id = subtraces[trace_id]
+        while parent_trace_id != None:
+            from_address = traces[parent_trace_id]["from_address"]
+            ancestors.append(from_address)
+            trace_id = parent_trace_id
+            parent_trace_id = subtraces[trace_id]
+
+        return ancestors
+
+    @staticmethod
     def traversal_with_dfs(tree):
         paths = []
         path = []
@@ -63,7 +75,8 @@ class TraceUtil:
                 for trace_id in path:
                     from_address = traces[tx_hash][trace_id]["from_address"]
                     to_address = traces[tx_hash][trace_id]["to_address"]
-                    callee = TraceUtil.get_callee(traces[tx_hash][trace_id]['trace_type'], traces[tx_hash][trace_id]['input'])
+                    callee = TraceUtil.get_callee(
+                        traces[tx_hash][trace_id]['trace_type'], traces[tx_hash][trace_id]['input'])
                     straces.append((from_address, to_address, callee))
                 subtrace_hash = TraceUtil.hash_subtraces(straces)
                 path_sigs.add(subtrace_hash)
