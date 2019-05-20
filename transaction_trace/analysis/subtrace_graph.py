@@ -7,6 +7,7 @@ from web3 import Web3
 
 from ..local import EthereumDatabase
 from .trace_util import TraceUtil
+from ..datetime_utils import time_to_str
 
 l = logging.getLogger("transaction-trace.analysis.SubtraceGraph")
 
@@ -17,9 +18,11 @@ class SubtraceGraph:
 
     def _subtrace_graph_by_tx(self, tx_hash, subtraces, traces):
         subtrace_graph = nx.DiGraph(
-            transaction_hash=tx_hash, date=self._db_conn.date)
+            transaction_hash=tx_hash, date=self._db_conn.date, time="", caller="0x")
         for trace_id in subtraces:
             parent_trace_id = subtraces[trace_id]
+            if parent_trace_id == None:
+                subtrace_graph.graph["caller"] = traces[trace_id]["from_address"]
 
             trace = traces[trace_id]
             if trace["status"] == 0:
@@ -28,6 +31,9 @@ class SubtraceGraph:
             to_address = trace["to_address"]
             trace_type = trace["trace_type"]
             trace_input = trace["input"]
+            time = trace["block_timestamp"]
+            if subtrace_graph.graph["time"] == "":
+                subtrace_graph.graph["time"] = time_to_str(time)
 
             # this can only be `call`, `create` or `suicide`
             # when trace_type is `call`, record callee"s signature
@@ -79,56 +85,12 @@ class SubtraceGraph:
             yield subtrace_graph, traces, subtraces
 
 
-key_funcs = {
-    "owner": {
-        "0x13af4035": ("setOwner(address)", 34),
-        "0xe46dcfeb": ("initWallet(address[],uint256,uint256)", 290),
-        "0xf2fde38b": ("transferOwnership(address)", 34),
-        "0xf1739cae": ("transferProxyOwnership(address)", 34),
-        "0xa6f9dae1": ("changeOwner(address)", 34),
-        "0x2af4c31e": ("changeOwnership(address)", 34),
-        "0x7065cb48": ("addOwner(address)", 34),
-        "0xc57c5f60": ("initMultiowned(address[],uint256)", 290),
-        "0x1b580620": ("setOwner1(address)", 34),
-        "0x5825884f": ("setOwner2(address)", 34),
-        "0xa39a45b7": ("replaceOwner(address)", 34),
-        "0xe20056e6": ("replaceOwner(address,address)", 98),
-        "0x0952c504": ("requestOwnershipTransfer(address)", 34),
-        "0x2877a49c": ("AddOwnership(address)", 34),
-        "0x4f60f334": ("multiAccessAddOwner(address)", 34),
-        "0x880cdc31": ("updateOwner(address)", 34),
-        "0x85952454": ("newOwner(address)", 34),
-    },
-    "token": {
-        "0xa9059cbb": ("transfer(address,uint256)", 34),
-        "0x23b872dd": ("transferFrom(address,address,uint256)", 98),
-        "0x095ea7b3": ("approve(address,uint256)", 34),
-        "0x42842e0e": ("safeTransferFrom(address,address,uint256)", 98),
-        "0xb88d4fde": ("safeTransferFrom(address,address,uint256,bytes)", 98),
-        "0x40c10f19": ("mint(address,uint256)", 34),
-        "0xb5e73249": ("mint(address,uint256,bool,uint32)", 34),
-        "0xf0dda65c": ("mintTokens(address,uint256)", 34),
-        "0x79c65068": ("mintToken(address,uint256)", 34),
-        "0x449a52f8": ("mintTo(address,uint256)", 34),
-        "0x2f81bc71": ("multiMint(address[],uint256[])", 226)
-    }
-}
-
-
 class SubtraceGraphAnalyzer:
     def __init__(self, subtrace_graph, log_file):
         self.subtrace_graph = subtrace_graph
         self.log_file = log_file
 
         self.analysis_cache = dict()
-        self.analysis_cache["key_funcs"] = dict()
-        for func_type in key_funcs:
-            for func_hash in key_funcs[func_type]:
-                func_name = key_funcs[func_type][func_hash][0]
-                benefit_pos = key_funcs[func_type][func_hash][1]
-                func_hex = binascii.b2a_hex(func_name.encode("utf-8")).decode()
-                self.analysis_cache["key_funcs"][func_hash] = (
-                    func_name, func_hex, benefit_pos)
 
     def record_abnormal_detail(self, detail):
         print(detail, file=self.log_file)
@@ -139,144 +101,6 @@ class SubtraceGraphAnalyzer:
             edges.append((cycle[index], cycle[index+1]))
         edges.append((cycle[-1], cycle[0]))
         return edges
-
-    def find_call_injection(self, graph, cycles, key_func: bool = True):
-        ABNORMAL_TYPE = "CallInjection"
-
-        l.debug("Searching for Call Injection")
-
-        tx_hash = graph.graph["transaction_hash"]
-        detail_list = set()
-        for cycle in cycles:
-            # call injection has to call another method in the same contract
-            # which forms self-loop in our graph
-            if len(cycle) != 1:
-                continue
-
-            data = graph.get_edge_data(cycle[0], cycle[0])
-            for call_trace in data["call_traces"]:
-                trace_id = call_trace["trace_id"]
-                parent_trace_id = call_trace["parent_trace_id"]
-                gas_used = call_trace["gas_used"]
-                callee = call_trace["callee"]
-                caller_address = self.analysis_cache["traces"][tx_hash][parent_trace_id]["from_address"]
-                call_type = self.analysis_cache["traces"][tx_hash][trace_id]["call_type"]
-                if call_type == "delegatecall":
-                    continue
-
-                if parent_trace_id == None or gas_used == None or not callee.startswith("0x"):
-                    continue
-                callee = TraceUtil.get_callee(
-                    self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
-                parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"][10:]
-                injection = list(self._find_call_injection(
-                    tx_hash, trace_id, parent_trace_input, callee, key_func))
-
-                if len(injection) > 0:
-                    l.info(
-                        "Call injection found for %s with entry %s behavior: %s",
-                        tx_hash, cycle[0], injection)
-                    detail = {
-                        "date": graph.graph["date"],
-                        "abnormal_type": ABNORMAL_TYPE,
-                        "tx_hash": tx_hash,
-                        "entry": cycle[0],
-                        "caller": caller_address,
-                        "call_type": call_type,
-                        "func": callee,
-                        "parent_func": TraceUtil.get_callee(self.analysis_cache["traces"][tx_hash][parent_trace_id]["trace_type"], parent_trace_input),
-                        "behavior": injection
-                    }
-                    detail_list.add(str(detail))
-
-        # check call injection on delegate call
-        for trace_id in self.analysis_cache["subtraces"][tx_hash]:
-            parent_trace_id = self.analysis_cache["subtraces"][tx_hash][trace_id]
-            trace_type = self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"]
-            call_type = self.analysis_cache["traces"][tx_hash][trace_id]["call_type"]
-            status = self.analysis_cache["traces"][tx_hash][trace_id]["status"]
-            from_address = self.analysis_cache["traces"][tx_hash][trace_id]["from_address"]
-            to_address = self.analysis_cache["traces"][tx_hash][trace_id]["to_address"]
-            if status == 1 and trace_type == "call" and (call_type == "delegatecall" and from_address != to_address or call_type == "callcode"):
-                callee = TraceUtil.get_callee(
-                    trace_type, self.analysis_cache["traces"][tx_hash][trace_id]["input"])
-                while parent_trace_id != None:
-                    parent_trace_type = self.analysis_cache["traces"][tx_hash][parent_trace_id]["trace_type"]
-                    parent_call_type = self.analysis_cache["traces"][tx_hash][parent_trace_id]["call_type"]
-                    if parent_trace_type == "call" and (parent_call_type == "delegatecall" or parent_call_type == "callcode"):
-                        parent_trace_id = self.analysis_cache["subtraces"][tx_hash][parent_trace_id]
-                    else:
-                        break
-
-                callee = TraceUtil.get_callee(
-                    self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
-                parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"]
-                injection = list(self._find_call_injection(
-                    tx_hash, trace_id, parent_trace_input, callee, key_func))
-
-                if len(injection) > 0:
-                    entry = self.analysis_cache["traces"][tx_hash][parent_trace_id]["to_address"]
-                    caller_address = self.analysis_cache["traces"][tx_hash][parent_trace_id]["from_address"]
-                    l.info(
-                        "Call injection found for %s with entry %s behavior: %s",
-                        tx_hash, entry, injection)
-                    detail = {
-                        "date": graph.graph["date"],
-                        "abnormal_type": ABNORMAL_TYPE,
-                        "tx_hash": tx_hash,
-                        "entry": entry,
-                        "caller": caller_address,
-                        "call_type": call_type,
-                        "func": callee,
-                        "parent_func": TraceUtil.get_callee(parent_trace_type, parent_trace_input),
-                        "behavior": injection
-                    }
-                    detail_list.add(str(detail))
-
-        for detail in detail_list:
-            self.record_abnormal_detail(detail)
-
-    def _find_call_injection(self, tx_hash, trace_id, parent_trace_input, callee, key_func: bool):
-        injection = set()
-        if len(parent_trace_input) > 10:
-            if callee[2:] in parent_trace_input or callee in self.analysis_cache["key_funcs"] and self.analysis_cache["key_funcs"][callee][1] in parent_trace_input:
-                if not key_func:
-                    injection.add(None)
-                else:
-                    stack = list()
-                    stack.append(trace_id)
-                    while len(stack) > 0:
-                        s_trace_id = stack.pop()
-                        trace_input = self.analysis_cache["traces"][tx_hash][s_trace_id]["input"]
-                        trace_type = self.analysis_cache["traces"][tx_hash][s_trace_id]["trace_type"]
-                        to_address = self.analysis_cache["traces"][tx_hash][s_trace_id]["to_address"]
-                        ancestors = None
-                        if trace_type == "suicide":
-                            ancestors = TraceUtil.get_all_ancestors(
-                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
-                            if to_address in ancestors:
-                                injection.add("suicide")
-                        elif trace_type == "call" and len(trace_input) > 9 and trace_input[:10] in self.analysis_cache["key_funcs"]:
-                            ancestors = TraceUtil.get_all_ancestors(
-                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
-                            benefit_pos = self.analysis_cache["key_funcs"][trace_input[:10]][2]
-                            benefit_node = "0x" + \
-                                trace_input[benefit_pos: benefit_pos + 40]
-                            if benefit_node in ancestors:
-                                injection.add(
-                                    self.analysis_cache["key_funcs"][trace_input[:10]][0])
-                        trace_value = Web3.fromWei(
-                            self.analysis_cache["traces"][tx_hash][s_trace_id]["value"], "ether")
-                        if trace_value > 0:
-                            if ancestors == None:
-                                ancestors = TraceUtil.get_all_ancestors(
-                                    self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
-                            if to_address in ancestors:
-                                injection.add("ethTransfer")
-                        if s_trace_id in self.analysis_cache["tx_trees"][tx_hash]:
-                            children = self.analysis_cache["tx_trees"][tx_hash][s_trace_id]
-                            stack.extend(children)
-        return injection
 
     def count_subtrace_cycle(self, graph, cycle):
         def extract_trace_info(graph, u, v):
@@ -408,10 +232,6 @@ class SubtraceGraphAnalyzer:
                 self.analysis_cache["traces"] = traces
             if "subtraces" not in self.analysis_cache:
                 self.analysis_cache["subtraces"] = subtraces
-            if "tx_trees" not in self.analysis_cache:
-                self.analysis_cache["tx_trees"] = TraceUtil.build_call_tree(
-                    subtraces)
 
             self.find_reentrancy(subtrace_graph, cycles, eth_lost)
-            self.find_call_injection(subtrace_graph, cycles, False)
             self.find_bonus_hunitng(subtrace_graph)

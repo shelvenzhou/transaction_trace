@@ -6,3 +6,4 @@ from .traffic import TrafficAnalyzer
 from .call_after_destruct import CallAfterDestruct
 from .trace_util import TraceUtil
 from .authority import AuthorityAnalyzer
+from .call_injection import CallInjection
