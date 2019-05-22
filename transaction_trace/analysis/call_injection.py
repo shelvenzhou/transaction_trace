@@ -5,6 +5,8 @@ from collections import defaultdict
 import networkx as nx
 
 from .trace_util import TraceUtil
+from ..local import EthereumDatabase
+from ..datetime_utils import time_to_str
 
 l = logging.getLogger("transaction-trace.analysis.CallInjection")
 
@@ -30,16 +32,12 @@ key_functions = {
 
 
 class CallInjection:
-    key_funcs = dict()
-    backward_watch_list = dict()
-    forward_watch_list = dict()
-
     def __init__(self, log_file):
         self.log_file = log_file
 
         self.analysis_cache = dict()
         self.key_funcs = dict()
-        self.backward_watch_list = dict()
+        self.backward_watch_list = defaultdict(dict)
         self.forward_watch_list = dict()
         for func_type in key_functions:
             for func_hash in key_functions[func_type]:
@@ -55,6 +53,107 @@ class CallInjection:
 
     def record_abnormal_detail(self, detail):
         print(detail, file=self.log_file)
+
+    def filter_by_profitability(self, db_folder, input_log_file, from_time, to_time):
+        l.info("Extract watchList from input log file")
+        f = open(input_log_file)
+        lines = f.readlines()
+        rows = list()
+        for line in lines:
+            rows.append(eval(line.strip("\n")))
+
+        for row in rows:
+            if 'watchList' in row['behavior']:
+                self.backward_watch_list[row['caller']
+                                         ][row['entry']] = row['time']
+                forward_watch = (
+                    row['caller'], row['parent_func'], row['entry'], row['func'])
+                self.forward_watch_list[str(forward_watch)] = row['time']
+
+        traces_db = EthereumDatabase(db_folder)
+        token_transfer_db = EthereumDatabase(
+            f"{db_folder}/../ethereum_token_transfers", "token_transfers")
+        for traces_conn in traces_db.get_connections(from_time, to_time):
+            token_transfer_con = token_transfer_db.get_connection(
+                traces_conn.date)
+            l.info("Prepare data: %s", traces_conn)
+
+            traces = defaultdict(dict)
+            for row in traces_conn.read("traces", "rowid, transaction_hash, from_address, to_address, value, block_timestamp"):
+                tx_hash = row["transaction_hash"]
+                rowid = row["rowid"]
+                traces[tx_hash][rowid] = row
+
+            subtraces = defaultdict(dict)
+            for row in traces_conn.read_subtraces():
+                tx_hash = row["transaction_hash"]
+                trace_id = row["trace_id"]
+                parent_trace_id = row["parent_trace_id"]
+                subtraces[tx_hash][trace_id] = parent_trace_id
+
+            token_transfers = defaultdict(list)
+            for row in token_transfer_con.read("token_transfers", "*"):
+                tx_hash = row["transaction_hash"]
+                token_transfers[tx_hash].append(row)
+
+            for tx_hash in subtraces:
+                caller = "0x"
+                time = ""
+                eth_transfers = defaultdict(int)
+                callee = defaultdict(list)
+                for trace_id in subtraces[tx_hash]:
+                    trace = traces[tx_hash][trace_id]
+                    if subtraces[tx_hash][trace_id] == None:
+                        caller = trace["from_address"]
+                        time = time_to_str(trace["block_timestamp"])
+                        if caller not in self.backward_watch_list:
+                            break
+                    callee[trace["to_address"]].append(trace_id)
+                    if trace["value"] > 0:
+                        eth_transfers[trace["from_address"]] -= trace["value"]
+                        eth_transfers[trace["to_address"]] += trace["value"]
+
+                if caller in self.backward_watch_list:
+                    for entry in callee:
+                        if entry in self.backward_watch_list[caller] and time > self.backward_watch_list[caller][entry]:
+                            out = False
+                            for trace_id in callee[entry]:
+                                if out:
+                                    break
+                                ancestors = TraceUtil.get_all_ancestors(
+                                    traces[tx_hash], subtraces[tx_hash], trace_id)
+                                for addr in eth_transfers:
+                                    if eth_transfers[addr] < 0 and addr in ancestors:
+                                        self.backward_watch_list[caller][entry] = time
+                                        out = True
+                                        break
+                                for row in token_transfers[tx_hash]:
+                                    if row["from_address"] in ancestors:
+                                        self.backward_watch_list[caller][entry] = time
+                                        out = True
+                                        break
+
+        with open("/home/xiangjie/logs/pickles/watchList" , "wb") as f:
+            pickle.dump({"forward_watch_list": self.forward_watch_list, "backward_watch_list": self.backward_watch_list}, f)
+        # filter FPs according to watchList
+        l.info("Filter FPs according to watchList")
+        detail_list = list()
+        for row in rows:
+            forward_watch = (
+                row['caller'], row['parent_func'], row['entry'], row['func'])
+            if len(row['behavior']) == 1 and 'watchList' in row['behavior']:
+                continue
+            elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] < self.backward_watch_list[row['caller']][row['entry']]:
+                continue
+            elif forward_watch in self.forward_watch_list and row['time'] > self.forward_watch_list[forward_watch]:
+                continue
+            else:
+                if 'watchList' in row['behavior']:
+                    row['behavior'].remove('watchList')
+                detail_list.append(row)
+
+        for detail in detail_list:
+            self.record_abnormal_detail(str(detail))
 
     def analyze(self):
         self.analysis_cache.clear()
