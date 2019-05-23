@@ -64,11 +64,13 @@ class CallInjection:
 
         for row in rows:
             if 'watchList' in row['behavior']:
-                self.backward_watch_list[row['caller']
-                                         ][row['entry']] = row['time']
-                forward_watch = (
-                    row['caller'], row['parent_func'], row['entry'], row['func'])
-                self.forward_watch_list[str(forward_watch)] = row['time']
+                forward_watch = str(
+                    (row['caller'], row['parent_func'], row['entry']))
+                if forward_watch in self.forward_watch_list and self.forward_watch_list[forward_watch] < row['time']:
+                    continue
+                self.forward_watch_list[forward_watch] = row['time']
+            self.backward_watch_list[row['caller']
+                                     ][row['entry']] = "2015-08-07 00:00:00"
 
         traces_db = EthereumDatabase(db_folder)
         token_transfer_db = EthereumDatabase(
@@ -133,19 +135,20 @@ class CallInjection:
                                         out = True
                                         break
 
-        with open("/home/xiangjie/logs/pickles/watchList" , "wb") as f:
-            pickle.dump({"forward_watch_list": self.forward_watch_list, "backward_watch_list": self.backward_watch_list}, f)
+        with open("/home/xiangjie/logs/pickles/watchList", "wb") as f:
+            pickle.dump({"forward_watch_list": self.forward_watch_list,
+                         "backward_watch_list": self.backward_watch_list}, f)
         # filter FPs according to watchList
         l.info("Filter FPs according to watchList")
         detail_list = list()
         for row in rows:
-            forward_watch = (
-                row['caller'], row['parent_func'], row['entry'], row['func'])
+            forward_watch = str(
+                (row['caller'], row['parent_func'], row['entry']))
             if len(row['behavior']) == 1 and 'watchList' in row['behavior']:
                 continue
-            elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] < self.backward_watch_list[row['caller']][row['entry']]:
+            elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] <= self.backward_watch_list[row['caller']][row['entry']]:
                 continue
-            elif forward_watch in self.forward_watch_list and row['time'] > self.forward_watch_list[forward_watch]:
+            elif forward_watch in self.forward_watch_list and row['time'] >= self.forward_watch_list[forward_watch]:
                 continue
             else:
                 if 'watchList' in row['behavior']:
