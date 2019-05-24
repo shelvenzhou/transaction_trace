@@ -30,12 +30,11 @@ class TraceUtil:
     @staticmethod
     def get_all_ancestors(traces, subtraces, trace_id):
         ancestors = list()
-        parent_trace_id = subtraces[trace_id]
-        while parent_trace_id != None:
-            from_address = traces[parent_trace_id]["from_address"]
+        while trace_id != None:
+            from_address = traces[trace_id]["from_address"]
             ancestors.append(from_address)
-            trace_id = parent_trace_id
             parent_trace_id = subtraces[trace_id]
+            trace_id = parent_trace_id
 
         return ancestors
 

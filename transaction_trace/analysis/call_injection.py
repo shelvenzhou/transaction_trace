@@ -204,7 +204,7 @@ class CallInjection:
                     self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
                 parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"][10:]
                 injection = list(self._find_call_injection(
-                    tx_hash, trace_id, parent_trace_input, callee, key_func))
+                    tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func))
 
                 if len(injection) > 0:
                     l.info(
@@ -246,7 +246,7 @@ class CallInjection:
                     self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
                 parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"]
                 injection = list(self._find_call_injection(
-                    tx_hash, trace_id, parent_trace_input, callee, key_func))
+                    tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func))
 
                 if len(injection) > 0:
                     entry = self.analysis_cache["traces"][tx_hash][parent_trace_id]["to_address"]
@@ -269,7 +269,7 @@ class CallInjection:
         for detail in detail_list:
             self.record_abnormal_detail(detail)
 
-    def _find_call_injection(self, tx_hash, trace_id, parent_trace_input, callee, key_func: bool):
+    def _find_call_injection(self, tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func: bool):
         injection = set()
         if len(parent_trace_input) > 10:
             if callee[2:] in parent_trace_input or callee in self.key_funcs and self.key_funcs[callee][1] in parent_trace_input:
@@ -287,12 +287,12 @@ class CallInjection:
                         ancestors = None
                         if trace_type == "suicide":
                             ancestors = TraceUtil.get_all_ancestors(
-                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
+                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], parent_trace_id)
                             if to_address in ancestors:
                                 injection.add("suicide")
                         elif trace_type == "call" and len(trace_input) > 9 and trace_input[:10] in self.key_funcs:
                             ancestors = TraceUtil.get_all_ancestors(
-                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
+                                self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], parent_trace_id)
                             benefit_pos = self.key_funcs[trace_input[:10]][2]
                             benefit_node = "0x" + \
                                 trace_input[benefit_pos: benefit_pos + 40]
@@ -310,7 +310,7 @@ class CallInjection:
                         if trace_value > 0:
                             if ancestors == None:
                                 ancestors = TraceUtil.get_all_ancestors(
-                                    self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], trace_id)
+                                    self.analysis_cache["traces"][tx_hash], self.analysis_cache["subtraces"][tx_hash], parent_trace_id)
                             if to_address in ancestors:
                                 injection.add("ethTransfer")
                             if from_address in ancestors:
