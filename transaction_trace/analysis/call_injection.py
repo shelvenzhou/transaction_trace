@@ -39,6 +39,7 @@ class CallInjection:
         self.key_funcs = dict()
         self.backward_watch_list = defaultdict(dict)
         self.forward_watch_list = dict()
+        self.entry_creator = defaultdict(set)
         for func_type in key_functions:
             for func_hash in key_functions[func_type]:
                 func_name = key_functions[func_type][func_hash][0]
@@ -71,6 +72,7 @@ class CallInjection:
                 self.forward_watch_list[forward_watch] = row['time']
             self.backward_watch_list[row['caller']
                                      ][row['entry']] = "2015-08-07 00:00:00"
+            self.entry_creator[row['entry']] = "0x"
 
         traces_db = EthereumDatabase(db_folder)
         token_transfer_db = EthereumDatabase(
@@ -114,6 +116,11 @@ class CallInjection:
                     if trace["value"] > 0:
                         eth_transfers[trace["from_address"]] -= trace["value"]
                         eth_transfers[trace["to_address"]] += trace["value"]
+                    if trace["trace_type"] == "create" and trace["to_address"] in self.entry_creator:
+                        ancestors = TraceUtil.get_all_ancestors(
+                            traces[tx_hash], subtraces[tx_hash], trace_id)
+                        for node in ancestors:
+                            self.entry_creator[trace["to_address"]].add(node)
 
                 if caller in self.backward_watch_list:
                     for entry in callee:
@@ -137,14 +144,16 @@ class CallInjection:
 
         with open("/home/xiangjie/logs/pickles/watchList", "wb") as f:
             pickle.dump({"forward_watch_list": self.forward_watch_list,
-                         "backward_watch_list": self.backward_watch_list}, f)
+                         "backward_watch_list": self.backward_watch_list, "entry_creator": self.entry_creator}, f)
         # filter FPs according to watchList
         l.info("Filter FPs according to watchList")
         detail_list = list()
         for row in rows:
             forward_watch = str(
                 (row['caller'], row['parent_func'], row['entry']))
-            if len(row['behavior']) == 1 and 'watchList' in row['behavior']:
+            if row['caller'] in self.entry_creator[row['entry']]:
+                continue
+            elif len(row['behavior']) == 1 and 'watchList' in row['behavior']:
                 continue
             elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] <= self.backward_watch_list[row['caller']][row['entry']]:
                 continue
