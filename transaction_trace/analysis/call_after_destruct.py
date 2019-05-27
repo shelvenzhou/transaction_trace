@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from ..datetime_utils import str_to_time, time_to_str
 from .trace_analysis import TraceAnalysis
+from .trace_util import TraceUtil
 
 l = logging.getLogger("transaction-trace.analysis.CallAfterDestruct")
 
@@ -15,9 +16,10 @@ class CallAfterDestruct(TraceAnalysis):
         ABNORMAL_TYPE = "CallAfterDestruct"
 
         dead_contracts = defaultdict(dict)
-        call_after_destruct = defaultdict(dict)
+        # call_after_destruct = defaultdict(dict)
         for db_conn in self.database.get_connections(from_time, to_time):
             for row in db_conn.read_traces():
+                call_after_destruct = dict()
                 if row["status"] == 0:
                     continue
                 if row["trace_type"] == "suicide":
@@ -26,6 +28,7 @@ class CallAfterDestruct(TraceAnalysis):
                     dead_contracts[row["from_address"]
                                    ]["death_tx"] = row["transaction_hash"]
                 elif row["to_address"] in dead_contracts and time_to_str(row["block_timestamp"]) > dead_contracts[row["to_address"]]["death_time"] and row["to_address"] not in call_after_destruct:
+                    callee = TraceUtil.get_callee(row['trace_type'], row['input'])
                     call_after_destruct[row["to_address"]] = {
                         "death_time": dead_contracts[row["to_address"]]["death_time"],
                         "death_tx": dead_contracts[row["to_address"]]["death_tx"],
@@ -41,6 +44,7 @@ class CallAfterDestruct(TraceAnalysis):
                         "death time": call_after_destruct[row["to_address"]]["death_time"],
                         "death tx": call_after_destruct[row["to_address"]]["death_tx"],
                         "call time": call_after_destruct[row["to_address"]]["call_time"],
-                        "call tx": call_after_destruct[row["to_address"]]["call_tx"]
+                        "call tx": call_after_destruct[row["to_address"]]["call_tx"],
+                        "callee": callee
                     }
                     self.record_abnormal_detail(detail)

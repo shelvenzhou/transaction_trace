@@ -39,7 +39,7 @@ class CallInjection:
         self.key_funcs = dict()
         self.backward_watch_list = defaultdict(dict)
         self.forward_watch_list = dict()
-        self.entry_creator = defaultdict(set)
+        self.entry_creator = dict()
         for func_type in key_functions:
             for func_hash in key_functions[func_type]:
                 func_name = key_functions[func_type][func_hash][0]
@@ -66,13 +66,14 @@ class CallInjection:
         for row in rows:
             if 'watchList' in row['behavior']:
                 forward_watch = str(
-                    (row['caller'], row['parent_func'], row['entry']))
+                    (row['caller'], row['parent_func'], row['entry']), row['func'])
                 if forward_watch in self.forward_watch_list and self.forward_watch_list[forward_watch] < row['time']:
                     continue
                 self.forward_watch_list[forward_watch] = row['time']
             self.backward_watch_list[row['caller']
                                      ][row['entry']] = "2015-08-07 00:00:00"
-            self.entry_creator[row['entry']] = "0x"
+            self.entry_creator[row['entry']] = None
+            self.entry_creator[row['entry_caller']] = None
 
         traces_db = EthereumDatabase(db_folder)
         token_transfer_db = EthereumDatabase(
@@ -117,10 +118,8 @@ class CallInjection:
                         eth_transfers[trace["from_address"]] -= trace["value"]
                         eth_transfers[trace["to_address"]] += trace["value"]
                     if trace["trace_type"] == "create" and trace["to_address"] in self.entry_creator:
-                        ancestors = TraceUtil.get_all_ancestors(
+                        self.entry_creator[trace["to_address"]] = TraceUtil.get_all_ancestors(
                             traces[tx_hash], subtraces[tx_hash], trace_id)
-                        for node in ancestors:
-                            self.entry_creator[trace["to_address"]].add(node)
 
                 if caller in self.backward_watch_list:
                     for entry in callee:
@@ -137,7 +136,7 @@ class CallInjection:
                                         out = True
                                         break
                                 for row in token_transfers[tx_hash]:
-                                    if row["from_address"] in ancestors:
+                                    if row["from_address"] in ancestors and row['value'] > 0:
                                         self.backward_watch_list[caller][entry] = time
                                         out = True
                                         break
@@ -152,6 +151,8 @@ class CallInjection:
             forward_watch = str(
                 (row['caller'], row['parent_func'], row['entry']))
             if row['caller'] in self.entry_creator[row['entry']]:
+                continue
+            elif row['entry_caller'] in self.entry_creator[row['entry']] and row['caller'] in self.entry_creator[row['entry_caller']]:
                 continue
             elif len(row['behavior']) == 1 and 'watchList' in row['behavior']:
                 continue
@@ -224,6 +225,7 @@ class CallInjection:
                         "abnormal_type": ABNORMAL_TYPE,
                         "tx_hash": tx_hash,
                         "entry": cycle[0],
+                        "entry_caller": self.analysis_cache["traces"][tx_hash][parent_trace_id]["from_address"],
                         "caller": caller,
                         "call_type": call_type,
                         "func": callee,
@@ -267,6 +269,7 @@ class CallInjection:
                         "abnormal_type": ABNORMAL_TYPE,
                         "tx_hash": tx_hash,
                         "entry": entry,
+                        "entry_caller": self.analysis_cache["traces"][tx_hash][parent_trace_id]["from_address"],
                         "caller": caller,
                         "call_type": call_type,
                         "func": callee,
