@@ -206,10 +206,17 @@ class SubtraceGraphAnalyzer:
         for edge in graph.edges():
             data = graph.get_edge_data(*edge)
             if "create" in [call_trace["callee"] for call_trace in data["call_traces"]]:
+                profit = False
+                suicide = False
                 out_edges = graph.out_edges(edge[1])
                 for out_edge in out_edges:
                     out_edge_data = graph.get_edge_data(*out_edge)
-                    if "suicide" in [call_trace["callee"] for call_trace in out_edge_data["call_traces"]]:
+                    for call_trace in out_edge_data["call_traces"]:
+                        if call_trace["callee"] == "suicide":
+                            suicide =True
+                        elif call_trace["callee"] == "0xa9059cbb" and int(self.analysis_cache["traces"][tx_hash][call_trace["trace_id"]]["input"][74:], base=16) > 0:
+                            profit = True
+                    if profit and suicide:
                         hunting_times += 1
                         break
         if hunting_times > 5:
