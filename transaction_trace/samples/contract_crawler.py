@@ -12,13 +12,12 @@ async def main(db_filepath, api_key_filepath, addrs_filepath):
     with open(addrs_filepath, 'rb') as f:
         addrs = pickle.load(f)
 
-    con = sqlite3.connect('/home/xiangjie/database/etherscan.sqlite3')
+    con = sqlite3.connect(db_filepath)
     cur = con.cursor()
     rows = cur.execute('select ContractAddress, SourceCode from contracts')
     addrs_in_database = set()
     for row in rows:
         addrs_in_database.add(row[0])
-
 
     count = len(addrs)
     for addr in addrs:

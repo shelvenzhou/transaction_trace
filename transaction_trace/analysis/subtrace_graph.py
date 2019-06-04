@@ -7,6 +7,7 @@ from web3 import Web3
 
 from ..local import EthereumDatabase
 from .trace_util import TraceUtil
+from .trace_analysis import TraceAnalysis
 from ..datetime_utils import time_to_str
 
 l = logging.getLogger("transaction-trace.analysis.SubtraceGraph")
@@ -85,15 +86,11 @@ class SubtraceGraph:
             yield subtrace_graph, traces, subtraces
 
 
-class SubtraceGraphAnalyzer:
+class SubtraceGraphAnalyzer(TraceAnalysis):
     def __init__(self, subtrace_graph, log_file):
+        super(SubtraceGraphAnalyzer, self).__init__(log_file)
         self.subtrace_graph = subtrace_graph
-        self.log_file = log_file
-
         self.analysis_cache = dict()
-
-    def record_abnormal_detail(self, detail):
-        print(detail, file=self.log_file)
 
     def get_edges_from_cycle(self, cycle):
         edges = list()

@@ -5,6 +5,7 @@ from collections import defaultdict
 import networkx as nx
 
 from .trace_util import TraceUtil
+from .trace_analysis import TraceAnalysis
 from ..local import EthereumDatabase
 from ..datetime_utils import time_to_str
 
@@ -31,9 +32,9 @@ key_functions = {
 }
 
 
-class CallInjection:
+class CallInjection(TraceAnalysis):
     def __init__(self, log_file):
-        self.log_file = log_file
+        super(CallInjection, self).__init__(log_file)
 
         self.analysis_cache = dict()
         self.key_funcs = dict()
@@ -52,9 +53,6 @@ class CallInjection:
     def setup(self, subtrace_graph):
         self.subtrace_graph = subtrace_graph
 
-    def record_abnormal_detail(self, detail):
-        print(detail, file=self.log_file)
-
     def filter_by_profitability(self, db_folder, input_log_file, from_time, to_time):
         l.info("Extract watchList from input log file")
         f = open(input_log_file)
@@ -66,7 +64,7 @@ class CallInjection:
         for row in rows:
             if 'watchList' in row['behavior']:
                 forward_watch = str(
-                    (row['caller'], row['parent_func'], row['entry']), row['func'])
+                    (row['caller'], row['parent_func'], row['entry'], row['func']))
                 if forward_watch in self.forward_watch_list and self.forward_watch_list[forward_watch] < row['time']:
                     continue
                 self.forward_watch_list[forward_watch] = row['time']
@@ -84,7 +82,7 @@ class CallInjection:
             l.info("Prepare data: %s", traces_conn)
 
             traces = defaultdict(dict)
-            for row in traces_conn.read("traces", "rowid, transaction_hash, from_address, to_address, value, block_timestamp"):
+            for row in traces_conn.read("traces", "rowid, transaction_hash, from_address, to_address, value, trace_type, block_timestamp"):
                 tx_hash = row["transaction_hash"]
                 rowid = row["rowid"]
                 traces[tx_hash][rowid] = row
@@ -136,7 +134,7 @@ class CallInjection:
                                         out = True
                                         break
                                 for row in token_transfers[tx_hash]:
-                                    if row["from_address"] in ancestors and row['value'] > 0:
+                                    if row["from_address"] in ancestors and float(row['value']) > 0:
                                         self.backward_watch_list[caller][entry] = time
                                         out = True
                                         break
@@ -149,14 +147,14 @@ class CallInjection:
         detail_list = list()
         for row in rows:
             forward_watch = str(
-                (row['caller'], row['parent_func'], row['entry']))
+                (row['caller'], row['parent_func'], row['entry'], row['func']))
             if row['caller'] in self.entry_creator[row['entry']]:
                 continue
             elif row['entry_caller'] in self.entry_creator[row['entry']] and row['caller'] in self.entry_creator[row['entry_caller']]:
                 continue
             elif len(row['behavior']) == 1 and 'watchList' in row['behavior']:
                 continue
-            elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] <= self.backward_watch_list[row['caller']][row['entry']]:
+            elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] < self.backward_watch_list[row['caller']][row['entry']]:
                 continue
             elif forward_watch in self.forward_watch_list and row['time'] >= self.forward_watch_list[forward_watch]:
                 continue
@@ -214,7 +212,7 @@ class CallInjection:
                     self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
                 parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"][10:]
                 injection = list(self._find_call_injection(
-                    tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func))
+                    tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func, False))
 
                 if len(injection) > 0:
                     l.info(
@@ -257,7 +255,7 @@ class CallInjection:
                     self.analysis_cache["traces"][tx_hash][trace_id]["trace_type"], self.analysis_cache["traces"][tx_hash][trace_id]["input"])
                 parent_trace_input = self.analysis_cache["traces"][tx_hash][parent_trace_id]["input"]
                 injection = list(self._find_call_injection(
-                    tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func))
+                    tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func, call_type == "delegatecall"))
 
                 if len(injection) > 0:
                     entry = self.analysis_cache["traces"][tx_hash][parent_trace_id]["to_address"]
@@ -281,7 +279,7 @@ class CallInjection:
         for detail in detail_list:
             self.record_abnormal_detail(detail)
 
-    def _find_call_injection(self, tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func: bool):
+    def _find_call_injection(self, tx_hash, trace_id, parent_trace_id, parent_trace_input, callee, key_func: bool, delegatecall: bool):
         injection = set()
         if len(parent_trace_input) > 10:
             if callee[2:] in parent_trace_input or callee in self.key_funcs and self.key_funcs[callee][1] in parent_trace_input:
@@ -327,7 +325,7 @@ class CallInjection:
                                 injection.add("ethTransfer")
                             if from_address in ancestors:
                                 injection.add("watchList")
-                        if s_trace_id in self.analysis_cache["tx_trees"][tx_hash]:
+                        if s_trace_id in self.analysis_cache["tx_trees"][tx_hash] and not delegatecall:
                             children = self.analysis_cache["tx_trees"][tx_hash][s_trace_id]
                             stack.extend(children)
         return injection

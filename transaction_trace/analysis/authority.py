@@ -3,16 +3,13 @@ from collections import defaultdict
 
 from ..local import EthereumDatabase
 from .trace_util import TraceUtil
+from .trace_analysis import TraceAnalysis
 
 l = logging.getLogger("transaction-trace.analysis.AuthorityAnalyzer")
 
-class AuthorityAnalyzer:
+class AuthorityAnalyzer(TraceAnalysis):
     def __init__(self, db_folder, log_file):
-        self.database = EthereumDatabase(db_folder)
-        self.log_file = log_file
-
-    def record_abnormal_detail(self, detail):
-        print(detail, file=self.log_file)
+        super(AuthorityAnalyzer, self).__init__(db_folder, log_file)
 
     def find_failed_call_injection(self, from_time, to_time, input_log):
         call_injection = defaultdict(dict)

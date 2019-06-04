@@ -2,8 +2,9 @@ from ..local import EthereumDatabase
 
 
 class TraceAnalysis:
-    def __init__(self, db_folder, log_file):
-        self.database = EthereumDatabase(db_folder)
+    def __init__(self, log_file, db_folder=None):
+        if db_folder != None:
+            self.database = EthereumDatabase(db_folder)
         self.log_file = log_file
 
     def record_abnormal_detail(self, *args):
