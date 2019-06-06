@@ -109,8 +109,6 @@ class CallInjection(TraceAnalysis):
                     if subtraces[tx_hash][trace_id] == None:
                         caller = trace["from_address"]
                         time = time_to_str(trace["block_timestamp"])
-                        if caller not in self.backward_watch_list:
-                            break
                     callee[trace["to_address"]].append(trace_id)
                     if trace["value"] > 0:
                         eth_transfers[trace["from_address"]] -= trace["value"]
