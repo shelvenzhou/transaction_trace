@@ -15,5 +15,6 @@ setup(
         'numpy',
         'scipy',
         'py-etherscan-api',
+        'google-cloud-storage',
     ],
 )
