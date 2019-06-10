@@ -1,2 +1,2 @@
 from .ethereum_database import EthereumDatabase
-from .etherscan import Etherscan
+from .contract_code import ContractCode

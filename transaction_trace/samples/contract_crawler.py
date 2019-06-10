@@ -1,20 +1,20 @@
-import os
-import sys
 import asyncio
 import pickle
-import sqlite3
-from transaction_trace.local import Etherscan
+import sys
+
+from transaction_trace.local import ContractCode
+from transaction_trace.remote import Etherscan
 
 
 async def main(db_filepath, api_key_filepath, addrs_filepath):
-    es = Etherscan(api_key_filepath, db_filepath, '')
-    es.create_contracts_table()
+    r = Etherscan(api_key_filepath)
+    l = ContractCode(db_filepath, '')
+
     with open(addrs_filepath, 'rb') as f:
         addrs = pickle.load(f)
 
-    con = sqlite3.connect(db_filepath)
-    cur = con.cursor()
-    rows = cur.execute('select ContractAddress, SourceCode from contracts')
+    l.create_contracts_table()
+    rows = l.read('contracts', 'ContractAddress, SourceCode')
     addrs_in_database = set()
     for row in rows:
         addrs_in_database.add(row[0])
@@ -27,10 +27,11 @@ async def main(db_filepath, api_key_filepath, addrs_filepath):
         if len(addr) != 42 or not addr.startswith('0x'):
             print('not valid address')
         else:
-            await es.get_contract_info(addr)
+            contract = await r.get_contract_info(addr)
+            l.insert_contract([contract[x] for x in ContractCode.key_order])
             print(count, 'left')
 
-    await es.client.close()
+    await r.client.close()
 
 
 if __name__ == "__main__":
