@@ -88,7 +88,7 @@ class SubtraceGraph:
 
 class SubtraceGraphAnalyzer(TraceAnalysis):
     def __init__(self, subtrace_graph, log_file):
-        super(SubtraceGraphAnalyzer, self).__init__(log_file)
+        super(SubtraceGraphAnalyzer, self).__init__(log_file=log_file)
         self.subtrace_graph = subtrace_graph
         self.analysis_cache = dict()
 

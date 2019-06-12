@@ -1,8 +1,8 @@
 from ..local import EthereumDatabase
-
+import sys
 
 class TraceAnalysis:
-    def __init__(self, log_file, db_folder=None):
+    def __init__(self, db_folder=None, log_file=sys.stdout):
         if db_folder != None:
             self.database = EthereumDatabase(db_folder)
         self.log_file = log_file

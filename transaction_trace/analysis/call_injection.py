@@ -34,7 +34,7 @@ key_functions = {
 
 class CallInjection(TraceAnalysis):
     def __init__(self, log_file):
-        super(CallInjection, self).__init__(log_file)
+        super(CallInjection, self).__init__(log_file=log_file)
 
         self.analysis_cache = dict()
         self.key_funcs = dict()
