@@ -14,6 +14,8 @@ class PreProcess(TraceAnalysis):
 
     def preprecess(self):
         for conn in self.database.get_all_connnections():
+            l.info("construct for %s", conn)
+
             traces = defaultdict(dict)
             for row in conn.read_traces(with_rowid=True):
                 tx_hash = row['transaction_hash']

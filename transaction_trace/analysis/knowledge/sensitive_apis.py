@@ -49,11 +49,13 @@ class SensitiveAPIs:
     _encoded_functions = None
 
     _sensitive_para_index = {
+        # owner: owner_contract
         '0x13af4035': 0,
         '0xe46dcfeb': 0,
         '0xf2fde38b': 0,
         '0xa6f9dae1': 0,
         '0x7065cb48': 0,
+        # token: [from,] to, amount
         '0xa9059cbb': (0, 1),
         '0x23b872dd': (0, 1, 2),
         '0x40c10f19': (0, 1),
