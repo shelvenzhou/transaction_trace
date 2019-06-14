@@ -120,11 +120,15 @@ class SensitiveAPIs:
         elif sig in cls._sensitive_functions['token']:
             func_name = cls._sensitive_functions['token'][sig]
 
-            # hack here
+            # hack to fix NonEmptyPaddingBytes exception
             if func_name == 'transfer(address,uint256)':
                 if input_data[10:34] != ('0' * 24):
                     l.warning("non-zero padding for address in %s", trace['transaction_hash'])
                     input_data = input_data[:10] + ('0' * 24) + input_data[34:]
+            elif func_name == 'transferFrom(address,address,uint256)':
+                if input_data[10:34] != ('0' * 24) or input_data[74:98] != ('0' * 24):
+                    l.warning("non-zero padding for address in %s", trace['transaction_hash'])
+                    input_data = input_data[:10] + ('0' * 24) + input_data[34:74] + ('0' * 24) + input_data[98:]
 
             try:
                 paras = _extract_function_parameters(func_name, input_data)

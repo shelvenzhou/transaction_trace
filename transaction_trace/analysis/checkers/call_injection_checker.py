@@ -1,4 +1,7 @@
+import sys
+
 from .checker import Checker, CheckerType
+
 
 class CallInjectionChecker(Checker):
 

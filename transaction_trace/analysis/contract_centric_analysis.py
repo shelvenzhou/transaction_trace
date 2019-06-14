@@ -23,6 +23,9 @@ class ContractCentricAnalysis:
         contract_txs_index = dict()
 
         for call_tree, result_graph in pre_process.preprocess():
+            if call_tree is None:
+                continue
+
             normal_contracts = set()
             for e in call_tree.t.edges:
                 trace = call_tree.t.edges[e]
