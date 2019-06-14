@@ -29,6 +29,7 @@ class ContractCentricAnalysis:
             for contract in result_graph.g.nodes:
                 contracts.add(contract)
 
+            l.info("save index of %s", result_graph.tx.tx_hash)
             self.tx_index_db.insert_transactions_of_contract(result_graph.tx.tx_hash,
                                                              result_graph.tx.block_timestamp,
                                                              contracts)
