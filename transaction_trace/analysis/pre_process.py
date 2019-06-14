@@ -18,6 +18,9 @@ class PreProcess(TraceAnalysis):
 
             traces = defaultdict(dict)
             for row in conn.read_traces(with_rowid=True):
+                if row['trace_type'] not in ('call', 'create', 'suicide'):
+                    l.info("ignore trace of type %s", row['trace_type'])
+                    continue
                 tx_hash = row['transaction_hash']
                 rowid = row['rowid']
                 traces[tx_hash][rowid] = row
