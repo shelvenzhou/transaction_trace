@@ -10,7 +10,7 @@ l = logging.getLogger("transaction-trace.analysis.ContractCentricAnalysis")
 class ContractCentricAnalysis:
 
     def __init__(self, tx_index_filepath):
-        self.tx_index_db = ContractTransactions(tx_index_filepath)
+        # self.tx_index_db = ContractTransactions(tx_index_filepath)
 
         self.checkers = dict()
 
@@ -19,21 +19,35 @@ class ContractCentricAnalysis:
         self.checkers[checker.name] = checker
 
     def build_contract_transactions_index(self, pre_process, column_index=False):
-        self.tx_index_db.create_contract_transactions_table()
+        # self.tx_index_db.create_contract_transactions_table()
+        contract_txs_index = dict()
 
-        for _, result_graph in pre_process.preprocess():
-            if result_graph is None or len(result_graph.g.nodes) == 0:
-                continue
+        for call_tree, result_graph in pre_process.preprocess():
+            normal_contracts = set()
+            for e in call_tree.t.edges:
+                trace = call_tree.t.edges[e]
+                if trace['status'] == 0:
+                    continue
 
-            contracts = set()
+                normal_contracts.add(trace['from_address'])
+                normal_contracts.add(trace['to_address'])
+
+            sensitive_contracts = set()
             for contract in result_graph.g.nodes:
-                contracts.add(contract)
+                sensitive_contracts.add(contract)
 
             l.info("save index of %s", result_graph.tx.tx_hash)
-            self.tx_index_db.insert_transactions_of_contract(result_graph.tx.tx_hash,
-                                                             result_graph.tx.block_timestamp,
-                                                             contracts)
-            self.tx_index_db.commit()
+            # self.tx_index_db.insert_transactions_of_contract(result_graph.tx.tx_hash,
+            #                                                  result_graph.tx.block_timestamp,
+            #                                                  contracts)
+            # self.tx_index_db.commit()
 
-        if column_index:
-            self.tx_index_db.create_contract_index()
+            for c in sensitive_contracts:
+                contract_txs_index[c] = (call_tree.tx.block_timestamp, call_tree.tx.tx_hash, True)
+            for c in (normal_contracts - sensitive_contracts):
+                contract_txs_index[c] = (call_tree.tx.block_timestamp, call_tree.tx.tx_hash, False)
+
+        # if column_index:
+        #     self.tx_index_db.create_contract_index()
+        import IPython
+        IPython.embed()
