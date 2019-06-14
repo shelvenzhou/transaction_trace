@@ -8,6 +8,7 @@ class CheckerType:
 
 
 class Checker:
+
     def __init__(self, log_file=sys.stdout):
         self.log_file = log_file
 

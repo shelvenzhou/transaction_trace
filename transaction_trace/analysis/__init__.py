@@ -9,3 +9,4 @@ from .authority import AuthorityAnalyzer
 from .call_injection import CallInjection
 from .pre_process import PreProcess
 from .contract_centric_analysis import ContractCentricAnalysis
+from .transaction_centric_analysis import TransactionCentricAnalysis

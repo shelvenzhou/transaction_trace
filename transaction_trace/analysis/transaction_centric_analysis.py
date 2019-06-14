@@ -15,5 +15,8 @@ class TransactionCentricAnalysis:
         self.checkers[checker.name] = checker
 
     def do_analysis(self, call_tree, result_graph):
+        if call_tree is None:
+            return
+
         for checker_name, checker in self.checkers.items():
             checker.check_transaction(call_tree, result_graph)

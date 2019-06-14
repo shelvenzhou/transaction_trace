@@ -9,7 +9,7 @@ l = logging.getLogger("transaction-trace.analysis.ContractCentricAnalysis")
 
 class ContractCentricAnalysis:
 
-    def __init__(self, tx_index_filepath):
+    def __init__(self):
         # self.tx_index_db = ContractTransactions(tx_index_filepath)
 
         self.checkers = dict()
@@ -36,7 +36,7 @@ class ContractCentricAnalysis:
             for contract in result_graph.g.nodes:
                 sensitive_contracts.add(contract)
 
-            l.info("save index of %s", result_graph.tx.tx_hash)
+            l.debug("save index of %s", result_graph.tx.tx_hash)
             # self.tx_index_db.insert_transactions_of_contract(result_graph.tx.tx_hash,
             #                                                  result_graph.tx.block_timestamp,
             #                                                  contracts)
