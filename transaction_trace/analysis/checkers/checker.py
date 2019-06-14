@@ -20,9 +20,21 @@ class Checker:
         raise NotImplementedError
 
     def check_transaction(self, action_tree, result_graph):
+        """
+        A transaction-centric checker must implement this.
+
+        It checks the abnormal actions and sensitive results caused by them, and return the addresses of victim
+        and attack contract for further filter.
+        """
         raise NotImplementedError
 
-    def check_contract(self, contract):
+    def check_contract(self, contract, related_txs):
+        """
+        A contract-centric checker must implement this.
+
+        It checks the ordered list of transactions which operate on the contract, and return the addresses of victim
+        and attack contract for further filter.
+        """
         raise NotImplementedError
 
     def record_abnormal_detail(self, *args):

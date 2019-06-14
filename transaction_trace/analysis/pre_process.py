@@ -30,10 +30,10 @@ class PreProcess(TraceAnalysis):
                 subtraces[tx_hash][trace_id] = parent_trace_id
 
             for tx_hash in traces:
-                l.info("construct action tree for %s", tx_hash)
+                l.debug("construct action tree for %s", tx_hash)
                 tree = ActionTree.build_action_tree(tx_hash, traces[tx_hash], subtraces[tx_hash])
                 if tree is not None:
-                    l.info("construct result graph for %s", tx_hash)
+                    l.debug("construct result graph for %s", tx_hash)
                     graph = ResultGraph.build_result_graph(tree)
 
                     yield tree, graph

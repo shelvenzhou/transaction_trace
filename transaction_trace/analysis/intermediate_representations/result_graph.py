@@ -65,10 +65,7 @@ class ResultGraph:
     @staticmethod
     def build_result_graph(action_tree):
         root = [n for n, d in action_tree.t.in_degree() if d == 0]
-        # assert len(root) == 1, "more than one root in action tree of %s" % action_tree.tx.tx_hash
         if len(root) > 1:
             l.warning("more than one root in action tree of %s", action_tree.tx.tx_hash)
-            import IPython
-            IPython.embed()
 
         return ResultGraph.build_partial_result_graph(action_tree, root[0])
