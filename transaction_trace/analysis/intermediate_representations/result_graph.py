@@ -41,8 +41,6 @@ class ResultGraph:
 
                 graph.add_edge(src, dst)
                 if result_type not in graph[src][dst]:
-                    if amount is None:
-                        import IPython; IPython.embed()
                     graph[src][dst][result_type] = amount
                 else:
                     graph[src][dst][result_type] += amount
