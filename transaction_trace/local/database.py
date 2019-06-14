@@ -34,10 +34,15 @@ class Database:
         cur = self._conn.cursor()
         return cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)
 
-    def insert(self, table, columns, placeholders, rows):
+    def insert(self, table, columns, placeholders, row):
         cur = self._conn.cursor()
         cur.execute(
-            f"INSERT INTO {table}{columns} VALUES ({placeholders})", rows)
+            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", row)
+
+    def batch_insert(self, table, columns, placeholders, rows):
+        cur = self._conn.cursor()
+        cur.executemany(
+            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", rows)
 
     def delete(self, table, conditions="", args=dict()):
         cur = self._conn.cursor()

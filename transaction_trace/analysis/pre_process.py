@@ -12,7 +12,7 @@ class PreProcess(TraceAnalysis):
     def __init__(self, db_folder, log_file=sys.stdout):
         super(PreProcess, self).__init__(db_folder, log_file)
 
-    def preprecess(self):
+    def preprocess(self):
         for conn in self.database.get_all_connnections():
             l.info("construct for %s", conn)
 
@@ -35,3 +35,5 @@ class PreProcess(TraceAnalysis):
                     graph = ResultGraph.build_result_graph(tree)
 
                     yield tree, graph
+
+                yield None, None

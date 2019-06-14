@@ -84,11 +84,23 @@ class SingleTraceDatabase(Database):
             );
         """)
 
-    def insert_traces(self, rows):
+    def insert_trace(self, row):
         """
         Manual database commit is needed.
         """
         self.insert(
+            "traces",
+            # "transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash",
+            "",
+            "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
+            row
+        )
+
+    def insert_traces(self, rows):
+        """
+        Manual database commit is needed.
+        """
+        self.batch_insert(
             "traces",
             # "transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash",
             "",
@@ -168,8 +180,15 @@ class SingleBlockDatabase(Database):
                 transaction_count INT
             ''')
 
-    def insert_blocks(self, rows):
+    def insert_block(self, row):
         self.insert(
+            table="blocks",
+            columns="",
+            placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
+            row=row)
+
+    def insert_blocks(self, rows):
+        self.batch_insert(
             table="blocks",
             columns="",
             placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
@@ -203,8 +222,15 @@ class SingleTransactionDatabase(Database):
                 block_hash TEXT NOT NULL
             ''')
 
-    def insert_txs(self, rows):
+    def insert_tx(self, row):
         self.insert(
+            table="transactions",
+            columns="",
+            placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
+            rows=row)
+
+    def insert_txs(self, rows):
+        self.batch_insert(
             table="transactions",
             columns="",
             placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
@@ -231,8 +257,16 @@ class SingleTokenTransferDatabase(Database):
                 PRIMARY KEY(transaction_hash, log_index)
             ''')
 
-    def insert_token_transfers(self, rows):
+    def insert_token_transfer(self, row):
         self.insert(
+            table="token_transfers",
+            columns="",
+            placeholders="? ,?, ?, ?, ? ,?, ?, ?, ?",
+            rows=row
+        )
+
+    def insert_token_transfers(self, rows):
+        self.batch_insert(
             table="token_transfers",
             columns="",
             placeholders="? ,?, ?, ?, ? ,?, ?, ?, ?",
@@ -259,8 +293,16 @@ class SingleContractDatabase(Database):
             '''
         )
 
-    def insert_contracts(self, rows):
+    def insert_contract(self, row):
         self.insert(
+            table="contracts",
+            columns="",
+            placeholders="?, ?, ?, ?, ?, ?, ?, ?",
+            rows=row
+        )
+
+    def insert_contracts(self, rows):
+        self.batch_insert(
             table="contracts",
             columns="",
             placeholders="?, ?, ?, ?, ?, ?, ?, ?",

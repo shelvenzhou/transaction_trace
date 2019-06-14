@@ -19,27 +19,27 @@ database_map = {
     "traces": {
         "class_name": "SingleTraceDatabase",
         "create": "create_traces_table",
-        "insert": "insert_traces"
+        "insert": "insert_trace"
     },
     "blocks": {
         "class_name": "SingleBlockDatabase",
         "create": "create_blocks_table",
-        "insert": "insert_blocks"
+        "insert": "insert_block"
     },
     "transactions": {
         "class_name": "SingleTransactionDatabase",
         "create": "create_txs_table",
-        "insert": "insert_txs"
+        "insert": "insert_tx"
     },
     "token_transfers": {
         "class_name": "SingleTokenTransferDatabase",
         "create": "create_token_transfers_table",
-        "insert": "insert_token_transfers"
+        "insert": "insert_token_transfer"
     },
     "contracts": {
         "class_name": "SingleContractDatabase",
         "create": "create_contracts_table",
-        "insert": "insert_contracts"
+        "insert": "insert_contract"
     }
 }
 
