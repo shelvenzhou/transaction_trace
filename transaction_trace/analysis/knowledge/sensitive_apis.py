@@ -105,7 +105,7 @@ class SensitiveAPIs:
 
             try:
                 paras = _extract_function_parameters(func_name, input_data)
-            except InsufficientDataBytes as e:
+            except Exception as e:
                 l.exception("transaction %s", trace['transaction_hash'])
                 return
 
@@ -132,7 +132,7 @@ class SensitiveAPIs:
 
             try:
                 paras = _extract_function_parameters(func_name, input_data)
-            except InsufficientDataBytes as e:
+            except Exception as e:
                 l.exception("transaction %s", trace['transaction_hash'])
                 return
 
