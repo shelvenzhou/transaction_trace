@@ -152,7 +152,7 @@ class CallInjection(TraceAnalysis):
                 continue
             elif len(row['behavior']) == 1 and 'watchList' in row['behavior']:
                 continue
-            elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] < self.backward_watch_list[row['caller']][row['entry']]:
+            elif row['caller'] in self.backward_watch_list and row['entry'] in self.backward_watch_list[row['caller']] and row['time'] <= self.backward_watch_list[row['caller']][row['entry']]:
                 continue
             elif forward_watch in self.forward_watch_list and row['time'] >= self.forward_watch_list[forward_watch]:
                 continue
