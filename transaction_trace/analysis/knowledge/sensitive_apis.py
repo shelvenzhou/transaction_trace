@@ -1,7 +1,8 @@
 import binascii
 import logging
-from eth_abi.exceptions import InsufficientDataBytes
-from eth_abi import decode_abi
+
+from eth_abi import decode_abi, decoding
+from eth_abi.registry import BaseEquals, registry
 
 from ..intermediate_representations import ResultType
 
@@ -15,13 +16,64 @@ def _extract_function_signature(input_data):
     return input_data[:10]
 
 
+def _read_data_from_stream(self, stream):
+    """
+    Add padding zeros as needed
+    """
+    data = stream.read(self.data_byte_size)
+
+    if len(data) != self.data_byte_size:
+        padding_size = self.data_byte_size - len(data)
+        l.warning("try to read %d bytes, only got %d bytes, padding with 0s", self.data_byte_size, len(data))
+        _data = bytearray()
+        if self.is_big_endian:
+            _data.extend(b'\x00' * padding_size)
+            _data.extend(data)
+        else:
+            _data.extend(data)
+            _data.extend(b'\x00' * padding_size)
+
+        data = bytes(_data)
+
+    return data
+
+
+decoding.FixedByteSizeDecoder.read_data_from_stream = _read_data_from_stream
+
+
+class FaultToleranceAddressDecoder(decoding.AddressDecoder):
+    """
+    To fix the NonZeroPadding exception of `address` data
+    """
+
+    def validate_padding_bytes(self, value, padding_bytes):
+        value_byte_size = self._get_value_byte_size()
+        padding_size = self.data_byte_size - value_byte_size
+
+        if padding_bytes != b'\x00' * padding_size:
+            l.warning("ignore non-zero padding")
+
+
+registry.unregister_decoder('address')
+registry.register_decoder(
+    BaseEquals('address'),
+    FaultToleranceAddressDecoder,
+    label='address',
+)
+
+
 def _extract_function_parameters(func_name, input_data):
     if input_data is None:
         return None
 
     paras = func_name.split('(')[1].split(')')[0].split(',')
 
-    return decode_abi(paras, bytes.fromhex(input_data[10:]))
+    try:
+        res = decode_abi(paras, bytes.fromhex(input_data[10:]))
+    except Exception as e:
+        l.exception()
+
+    return res
 
 
 class SensitiveAPIs:
@@ -94,6 +146,8 @@ class SensitiveAPIs:
 
     @classmethod
     def get_result_details(cls, trace):
+        l.info("result analysis of transaction %s", trace['transaction_hash'])
+
         input_data = trace['input']
 
         result_type = None
@@ -102,15 +156,9 @@ class SensitiveAPIs:
         sig = _extract_function_signature(input_data)
         if sig in cls._sensitive_functions['owner']:
             func_name = cls._sensitive_functions['owner'][sig]
-
-            try:
-                paras = _extract_function_parameters(func_name, input_data)
-            except Exception as e:
-                l.exception("transaction %s", trace['transaction_hash'])
-                return
+            paras = _extract_function_parameters(func_name, input_data)
 
             _dst = paras[cls._sensitive_para_index[sig]]
-
             if isinstance(_dst, str):
                 yield ResultType.OWNER_CHANGE, src, _dst, None
             else:
@@ -119,23 +167,7 @@ class SensitiveAPIs:
 
         elif sig in cls._sensitive_functions['token']:
             func_name = cls._sensitive_functions['token'][sig]
-
-            # hack to fix NonEmptyPaddingBytes exception
-            if func_name == 'transfer(address,uint256)':
-                if input_data[10:34] != ('0' * 24):
-                    l.warning("non-zero padding for address in %s", trace['transaction_hash'])
-                    input_data = input_data[:10] + ('0' * 24) + input_data[34:]
-            elif func_name == 'transferFrom(address,address,uint256)':
-                if input_data[10:34] != ('0' * 24) or input_data[74:98] != ('0' * 24):
-                    l.warning("non-zero padding for address in %s", trace['transaction_hash'])
-                    input_data = input_data[:10] + ('0' * 24) + input_data[34:74] + ('0' * 24) + input_data[98:]
-
-            try:
-                paras = _extract_function_parameters(func_name, input_data)
-            except Exception as e:
-                l.exception("transaction %s", trace['transaction_hash'])
-                return
-
+            paras = _extract_function_parameters(func_name, input_data)
             index = cls._sensitive_para_index[sig]
             if len(index) == 2:  # (to, amount)
                 _dst = paras[index[0]]
