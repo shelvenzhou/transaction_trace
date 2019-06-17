@@ -71,7 +71,8 @@ def _extract_function_parameters(func_name, input_data):
     try:
         res = decode_abi(paras, bytes.fromhex(input_data[10:]))
     except Exception as e:
-        l.exception()
+        l.exception("")
+        return None
 
     return res
 
@@ -157,6 +158,8 @@ class SensitiveAPIs:
         if sig in cls._sensitive_functions['owner']:
             func_name = cls._sensitive_functions['owner'][sig]
             paras = _extract_function_parameters(func_name, input_data)
+            if paras is None:
+                return
 
             _dst = paras[cls._sensitive_para_index[sig]]
             if isinstance(_dst, str):
@@ -168,6 +171,9 @@ class SensitiveAPIs:
         elif sig in cls._sensitive_functions['token']:
             func_name = cls._sensitive_functions['token'][sig]
             paras = _extract_function_parameters(func_name, input_data)
+            if paras is None:
+                return
+
             index = cls._sensitive_para_index[sig]
             if len(index) == 2:  # (to, amount)
                 _dst = paras[index[0]]
