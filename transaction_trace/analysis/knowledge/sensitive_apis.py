@@ -147,8 +147,6 @@ class SensitiveAPIs:
 
     @classmethod
     def get_result_details(cls, trace):
-        l.info("result analysis of transaction %s", trace['transaction_hash'])
-
         input_data = trace['input']
 
         result_type = None

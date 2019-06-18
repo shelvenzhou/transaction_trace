@@ -25,6 +25,8 @@ class ResultGraph:
 
     @staticmethod
     def build_partial_result_graph(action_tree, entry):
+        l.info("result analysis of transaction %s", action_tree.tx.tx_hash)
+
         graph = nx.DiGraph()
         for e in dfs_edges(action_tree.t, entry):
             trace = action_tree.t.edges[e]
