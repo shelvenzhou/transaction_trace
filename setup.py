@@ -17,5 +17,6 @@ setup(
         'py-etherscan-api',
         'eth_abi==1.3.0',
         'google-cloud-storage',
+        'klepto'
     ],
 )

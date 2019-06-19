@@ -20,7 +20,7 @@ class ContractCentricAnalysis:
 
     def build_contract_transactions_index(self, pre_process, column_index=False):
         # self.tx_index_db.create_contract_transactions_table()
-        contract_txs_index = dict()
+        contract_txs_index = defaultdict(set)
 
         for call_tree, result_graph in pre_process.preprocess():
             if call_tree is None:
@@ -46,9 +46,9 @@ class ContractCentricAnalysis:
             # self.tx_index_db.commit()
 
             for c in sensitive_contracts:
-                contract_txs_index[c] = (call_tree.tx.block_timestamp, call_tree.tx.tx_hash, True)
+                contract_txs_index[c].add((call_tree.tx.block_timestamp.date(), call_tree.tx.tx_hash, True))
             for c in (normal_contracts - sensitive_contracts):
-                contract_txs_index[c] = (call_tree.tx.block_timestamp, call_tree.tx.tx_hash, False)
+                contract_txs_index[c].add((call_tree.tx.block_timestamp.date(), call_tree.tx.tx_hash, False))
 
         # if column_index:
         #     self.tx_index_db.create_contract_index()

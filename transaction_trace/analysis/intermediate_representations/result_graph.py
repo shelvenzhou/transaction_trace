@@ -17,6 +17,9 @@ class SensitiveResult:
         self.details = details
 
 
+def invalid_contract_address(addr):
+    return addr.startswith("0x0000000000000000000000000000000000")
+
 class ResultGraph:
 
     def __init__(self, tx, graph):
@@ -41,6 +44,10 @@ class ResultGraph:
                 dst = trace['to_address']
                 amount = trace['value']
 
+                if invalid_contract_address(dst):
+                    l.warning("invalid transfer target: %s", dst)
+                    continue
+
                 graph.add_edge(src, dst)
                 if result_type not in graph[src][dst]:
                     graph[src][dst][result_type] = amount
@@ -53,6 +60,12 @@ class ResultGraph:
                     if result_type is None:
                         continue
                     elif result_type == ResultType.TOKEN_TRANSFER:
+                        if amount == 0:
+                            continue
+                        if invalid_contract_address(dst):
+                            l.warning("invalid transfer target: %s", dst)
+                            continue
+
                         graph.add_edge(src, dst)
                         if result_type not in graph[src][dst]:
                             graph[src][dst][result_type] = amount
