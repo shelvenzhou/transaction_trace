@@ -18,8 +18,10 @@ class ContractCentricAnalysis:
         assert checker.checker_type == CheckerType.CONTRACT_CENTRIC, "try to register a checker of wrong type"
         self.checkers[checker.name] = checker
 
-    def build_contract_transactions_index(self, pre_process, column_index=False):
+    def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=20000):
         self.tx_index_db.create_contract_transactions_table()
+
+        db_cache = list()
 
         for call_tree, result_graph in pre_process.preprocess():
             if call_tree is None:
@@ -42,16 +44,23 @@ class ContractCentricAnalysis:
 
             l.debug("save index of %s", call_tree.tx.tx_hash)
             if len(sensitive_contracts) > 0:
-                self.tx_index_db.insert_transactions_of_contract(call_tree.tx.tx_hash,
-                                                                call_tree.tx.block_timestamp.date(),
-                                                                sensitive_contracts,
-                                                                True)
+                db_cache.append((call_tree.tx.tx_hash,
+                                 call_tree.tx.block_timestamp.date(),
+                                 sensitive_contracts,
+                                 True))
             if len(unsensitive_contracts) > 0:
-                self.tx_index_db.insert_transactions_of_contract(call_tree.tx.tx_hash,
-                                                                call_tree.tx.block_timestamp.date(),
-                                                                unsensitive_contracts,
-                                                                False)
-            self.tx_index_db.commit()
+                db_cache.append((call_tree.tx.tx_hash,
+                                 call_tree.tx.block_timestamp.date(),
+                                 unsensitive_contracts,
+                                 False))
+
+            if len(db_cache) > db_cache_len:
+                l.info("insert data from cache to database")
+                for d in db_cache:
+                    self.tx_index_db.insert_transactions_of_contract(*d)
+
+                self.tx_index_db.commit()
+                db_cache.clear()
 
         if column_index:
             self.tx_index_db.create_contract_index()
