@@ -18,7 +18,7 @@ class ContractCentricAnalysis:
         assert checker.checker_type == CheckerType.CONTRACT_CENTRIC, "try to register a checker of wrong type"
         self.checkers[checker.name] = checker
 
-    def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=20000):
+    def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=100000):
         self.tx_index_db.create_contract_transactions_table()
 
         db_cache = list()
@@ -62,7 +62,9 @@ class ContractCentricAnalysis:
                 self.tx_index_db.commit()
                 db_cache.clear()
 
+        for d in db_cache:
+            self.tx_index_db.insert_transactions_of_contract(*d)
+        self.tx_index_db.commit()
+
         if column_index:
             self.tx_index_db.create_contract_index()
-        import IPython
-        IPython.embed()
