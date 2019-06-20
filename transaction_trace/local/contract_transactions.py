@@ -6,8 +6,11 @@ from .database import Database
 
 class ContractTransactions(Database):
 
-    def __init__(self, db_filepath):
-        super(ContractTransactions, self).__init__(db_filepath, "")
+    def __init__(self, db_filepath, user="contract_txs_idx", passwd="password", db="contract_txs_idx"):
+        super(ContractTransactions, self).__init__(db_filepath, "", inner_db="mysql",
+                                                   user=user,
+                                                   passwd=passwd,
+                                                   db=db)
 
     def __repr__(self):
         return "contract-centric transaction index"
@@ -18,7 +21,8 @@ class ContractTransactions(Database):
             CREATE TABLE IF NOT EXISTS contract_transactions(
                 contract TEXT,
                 transaction_date TIMESTAMP,
-                transaction_hash TEXT
+                transaction_hash TEXT,
+                sensitive_result BOOLEAN
             );
         """)
 
@@ -30,12 +34,12 @@ class ContractTransactions(Database):
             )
         """)
 
-    def insert_transactions_of_contract(self, tx_hash, date, contracts):
-        rows = [(contract, date, tx_hash) for contract in contracts]
-        self.batch_insert("contract_transactions", "contract, transaction_date, transaction_hash", "?, ?, ?", rows)
+    def insert_transactions_of_contract(self, tx_hash, date, contracts, sensitive):
+        rows = [(contract, date, tx_hash, sensitive) for contract in contracts]
+        self.batch_insert("contract_transactions", "contract, transaction_date, transaction_hash, sensitive_result", "%s, %s, %s, %s", rows)
 
     def read_transactions_of_contract(self, contract):
-        rows = self.read("contract_transactions", "transaction_date, transaction_hash", "WHERE contract=?", (contract,))
+        rows = self.read("contract_transactions", "transaction_date, transaction_hash", "WHERE contract=%s", (contract,))
         txs = defaultdict(list)
         for row in rows:
             txs[date_to_str(row["transaction_date"])].append(row["transaction_hash"])

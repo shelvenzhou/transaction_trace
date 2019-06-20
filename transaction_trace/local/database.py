@@ -1,14 +1,18 @@
 import sqlite3
+import MySQLdb
 
 
 class Database:
-    def __init__(self, db_filepath, date):
+    def __init__(self, db_filepath, date, inner_db="sqlite3", **args):
         self._filepath = db_filepath
         self._date = date
 
-        conn = sqlite3.connect(
-            db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
-        conn.row_factory = sqlite3.Row
+        if inner_db == "sqlite3":
+            conn = sqlite3.connect(
+                db_filepath, detect_types=sqlite3.PARSE_DECLTYPES)
+            conn.row_factory = sqlite3.Row
+        elif inner_db == "mysql":
+            conn = MySQLdb.connect(**args)
 
         self._conn = conn
 
