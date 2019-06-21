@@ -17,7 +17,7 @@ def main(db_folder, log_path):
         tca = TransactionCentricAnalysis(log_file)
         tca.register_transaction_centric_checker(CallInjectionChecker())
         tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
-        tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
+        tca.register_transaction_centric_checker(IntegerOverflowChecker(10**65))
         tca.register_transaction_centric_checker(ReentrancyChecker(5))
 
         cca = ContractCentricAnalysis()

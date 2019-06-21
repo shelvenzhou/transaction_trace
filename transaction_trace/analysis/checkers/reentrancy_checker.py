@@ -105,8 +105,8 @@ class ReentrancyChecker(Checker):
                 # compute whole transaction economic lost
                 rg = ResultGraph.build_result_graph(action_tree)
                 lost = list()
-                for node in rg.g.nodes[node]:
-                    for result_type in prg.g.nodes[node]:
+                for node in rg.g.nodes():
+                    for result_type in rg.g.nodes[node]:
                         if result_type == ResultType.OWNER_CHANGE:
                             continue
                         elif rg.g.nodes[node][result_type] < -self.minimum_profit_amount:
