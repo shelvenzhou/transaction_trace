@@ -2,6 +2,7 @@ import logging
 
 from .checkers import CheckerType
 from .trace_analysis import TraceAnalysis
+from ..datetime_utils import time_to_str
 
 l = logging.getLogger("transaction-trace.analysis.TransactionCentricAnalysis")
 
@@ -25,6 +26,6 @@ class TransactionCentricAnalysis(TraceAnalysis):
 
         tx = call_tree.tx
         if tx.is_attack:
-            l.info("%s | %s %s", str(tx.block_timestamp), tx.tx_hash, str(
+            l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
                 set([attack['checker'] for attack in tx.attack_details])))
             self.record_abnormal_detail(tx.to_string())

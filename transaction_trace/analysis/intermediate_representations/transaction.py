@@ -1,3 +1,6 @@
+from ...datetime_utils import time_to_str
+
+
 class Transaction:
 
     def __init__(self, tx_hash, block_number, tx_index, block_timestamp, block_hash, caller):
@@ -20,7 +23,7 @@ class Transaction:
     def to_string(self):
         tx_detail = {
             'tx_hash': self.tx_hash,
-            'block_timestamp': str(self.block_timestamp),
+            'block_timestamp': time_to_str(self.block_timestamp),
             'caller': self.caller,
             'attack_detials': self.attack_details
         }

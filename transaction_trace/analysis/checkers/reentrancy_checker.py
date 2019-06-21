@@ -106,14 +106,15 @@ class ReentrancyChecker(Checker):
                 rg = ResultGraph.build_result_graph(action_tree)
                 lost = list()
                 for node in rg.g.nodes[node]:
-                    if result_type == ResultType.OWNER_CHANGE:
-                        continue
-                    elif rg.g.nodes[node][result_type] > self.minimum_profit_amount:
-                        results.append({
-                            "profit_node": node,
-                            "result_type": result_type,
-                            "amount": rg.g.nodes[node][result_type]
-                        })
+                    for result_type in prg.g.nodes[node]:
+                        if result_type == ResultType.OWNER_CHANGE:
+                            continue
+                        elif rg.g.nodes[node][result_type] < -self.minimum_profit_amount:
+                            lost.append({
+                                "node": node,
+                                "result_type": result_type,
+                                "amount": rg.g.nodes[node][result_type]
+                            })
 
                 tx.attack_details.append({
                     "checker": self.name,

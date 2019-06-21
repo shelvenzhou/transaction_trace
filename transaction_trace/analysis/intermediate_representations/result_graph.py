@@ -48,7 +48,7 @@ class ResultGraph:
                 graph.add_edge(src, dst)
                 if result_type not in graph[src][dst]:
                     graph[src][dst][result_type] = amount
-                    graph.nodes[src][result_type] = 0 - amount
+                    graph.nodes[src][result_type] = -amount
                     graph.nodes[dst][result_type] = amount
                 else:
                     graph[src][dst][result_type] += amount
@@ -64,7 +64,7 @@ class ResultGraph:
                         graph.add_edge(src, dst)
                         if result_type not in graph[src][dst]:
                             graph[src][dst][result_type] = amount
-                            graph.nodes[src][result_type] = 0 - amount
+                            graph.nodes[src][result_type] = -amount
                             graph.nodes[dst][result_type] = amount
                         else:
                             graph[src][dst][result_type] += amount
