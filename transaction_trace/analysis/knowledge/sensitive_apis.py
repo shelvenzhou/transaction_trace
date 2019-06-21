@@ -9,7 +9,14 @@ from ..intermediate_representations import ResultType
 l = logging.getLogger("transaction-trace.analysis.knowledge.SensitiveAPIs")
 
 
-def _extract_function_signature(input_data):
+def patched_zip(dst, amount):
+    if isinstance(amount, int):
+        for _dst in dst:
+            yield _dst, amount
+    else:
+        return zip(dst, amount)
+
+def extract_function_signature(input_data):
     if input_data is None:
         return None
 
@@ -24,7 +31,8 @@ def _read_data_from_stream(self, stream):
 
     if len(data) != self.data_byte_size:
         padding_size = self.data_byte_size - len(data)
-        l.warning("try to read %d bytes, only got %d bytes, padding with 0s", self.data_byte_size, len(data))
+        l.warning("try to read %d bytes, only got %d bytes, padding with 0s",
+                  self.data_byte_size, len(data))
         _data = bytearray()
         if self.is_big_endian:
             _data.extend(b'\x00' * padding_size)
@@ -95,6 +103,10 @@ class SensitiveAPIs:
             '0x79c65068': 'mintToken(address,uint256)',
             '0x449a52f8': 'mintTo(address,uint256)',
             '0x2f81bc71': 'multiMint(address[],uint256[])',
+            '0x35bce6e4': 'transferMulti(address[],uint256[])',
+            '0xeb502d45': 'transferProxy(address,address,uint256,uint256,uint8,bytes32,bytes32)',
+            '0x83f12fec': 'batchTransfer(address[],uint256)',
+            '0x1e89d545': 'multiTransfer(address[],uint256[])'
         }
     }
 
@@ -116,6 +128,10 @@ class SensitiveAPIs:
         '0x79c65068': (0, 1),
         '0x449a52f8': (0, 1),
         '0x2f81bc71': (0, 1),
+        '0x35bce6e4': (0, 1),
+        '0xeb502d45': (0, 1, 2),
+        '0x83f12fec': (0, 1),
+        '0x1e89d545': (0, 1)
     }
 
     @classmethod
@@ -125,11 +141,20 @@ class SensitiveAPIs:
                 'owner': {},
                 'token': {},
             }
-            for t in _sensitive_functions:
-                for sig, func in _sensitive_functions[t]:
-                    cls._encoded_functions[t][sig] = binascii.b2a_hex(func.encode("utf-8")).decode()
+            for t in cls._sensitive_functions:
+                for sig in cls._sensitive_functions[t]:
+                    cls._encoded_functions[t][sig] = binascii.b2a_hex(
+                        cls._sensitive_functions[t][sig].encode("utf-8")).decode()
 
         return cls._encoded_functions
+
+    @classmethod
+    def func_name(cls, input_data):
+        callee = extract_function_signature(input_data)
+        for t in cls._sensitive_functions:
+            if callee in cls._sensitive_functions[t]:
+                return cls._sensitive_functions[t][callee]
+        return callee
 
     @classmethod
     def owner_change_functions(cls):
@@ -141,19 +166,19 @@ class SensitiveAPIs:
 
     @classmethod
     def sensitive_function_call(cls, input_data):
-        callee = _extract_function_signature(input_data)
+        callee = extract_function_signature(input_data)
         return callee in cls._sensitive_functions['owner'] or callee in cls._sensitive_functions['token']
 
     @classmethod
     def get_result_details(cls, trace):
-        l.info("result analysis of transaction %s", trace['transaction_hash'])
+        # l.info("result analysis of transaction %s", trace['transaction_hash'])
 
         input_data = trace['input']
 
         result_type = None
         src = trace['from_address']
 
-        sig = _extract_function_signature(input_data)
+        sig = extract_function_signature(input_data)
         if sig in cls._sensitive_functions['owner']:
             func_name = cls._sensitive_functions['owner'][sig]
             paras = _extract_function_parameters(func_name, input_data)
@@ -176,7 +201,7 @@ class SensitiveAPIs:
                 if isinstance(_dst, str):
                     yield ResultType.TOKEN_TRANSFER, src, _dst, _amount
                 else:
-                    for dst, amount in zip(_dst, _amount):
+                    for dst, amount in patched_zip(_dst, _amount):
                         yield ResultType.TOKEN_TRANSFER, src, dst, amount
             else:  # (from, to, amount)
                 src = paras[index[0]]

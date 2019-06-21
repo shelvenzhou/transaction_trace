@@ -24,9 +24,15 @@ class ResultGraph:
         self.g = graph
 
     @staticmethod
-    def build_partial_result_graph(action_tree, entry):
+    def build_partial_result_graph(action_tree, entry, direct_trace=False):
         graph = nx.DiGraph()
-        for e in dfs_edges(action_tree.t, entry):
+
+        if direct_trace:
+            edges = action_tree.t.out_edges(entry)
+        else:
+            edges = dfs_edges(action_tree.t, entry)
+
+        for e in edges:
             trace = action_tree.t.edges[e]
 
             if trace['status'] == 0:  # error trace will not cause any results
@@ -42,8 +48,12 @@ class ResultGraph:
                 graph.add_edge(src, dst)
                 if result_type not in graph[src][dst]:
                     graph[src][dst][result_type] = amount
+                    graph.nodes[src][result_type] = 0 - amount
+                    graph.nodes[dst][result_type] = amount
                 else:
                     graph[src][dst][result_type] += amount
+                    graph.nodes[src][result_type] -= amount
+                    graph.nodes[dst][result_type] += amount
 
             elif SensitiveAPIs.sensitive_function_call(trace['input']):
                 # check input data for token transfer and owner change
@@ -54,11 +64,16 @@ class ResultGraph:
                         graph.add_edge(src, dst)
                         if result_type not in graph[src][dst]:
                             graph[src][dst][result_type] = amount
+                            graph.nodes[src][result_type] = 0 - amount
+                            graph.nodes[dst][result_type] = amount
                         else:
                             graph[src][dst][result_type] += amount
+                            graph.nodes[src][result_type] -= amount
+                            graph.nodes[dst][result_type] += amount
                     else:  # ResultType.OWNER_CHANGE
                         graph.add_edge(src, dst)
                         graph[src][dst][result_type] = None
+                        graph.nodes[dst][result_type] = None
 
         return ResultGraph(action_tree.tx, graph)
 

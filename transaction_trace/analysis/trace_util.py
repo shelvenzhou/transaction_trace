@@ -1,5 +1,6 @@
 from collections import defaultdict
 from hashlib import sha256
+from .intermediate_representations import extract_address_from_node
 
 
 class TraceUtil:
@@ -37,6 +38,19 @@ class TraceUtil:
             parent_trace_id = subtraces[trace_id]
             trace_id = parent_trace_id
 
+        return ancestors
+
+    @staticmethod
+    def get_all_ancestors_from_tree(tree, entry):
+        ancestors = set()
+        while entry != None:
+            parent_edges = list(tree.in_edges(entry))
+            if len(parent_edges) == 0:
+                entry = None
+            else:
+                entry = parent_edges[0][0]
+                node = extract_address_from_node(entry)
+                ancestors.add(node)
         return ancestors
 
     @staticmethod

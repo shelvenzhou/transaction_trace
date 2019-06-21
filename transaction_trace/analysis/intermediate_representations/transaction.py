@@ -16,3 +16,12 @@ class Transaction:
 
     def __repr__(self):
         return "meta-data of transaction %s" % self.tx_hash
+
+    def to_string(self):
+        tx_detail = {
+            'tx_hash': self.tx_hash,
+            'block_timestamp': str(self.block_timestamp),
+            'caller': self.caller,
+            'attack_detials': self.attack_details
+        }
+        return str(tx_detail)
