@@ -85,25 +85,25 @@ class ReentrancyChecker(Checker):
         tx = action_tree.tx
         # search partial-result-graph for each candidate
         for (entry, turns_count) in candidates:
-            prg = ResultGraph.build_partial_result_graph(action_tree, entry)
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, entry)
 
             results = list()
-            for node in prg.g.nodes():
-                for result_type in prg.g.nodes[node]:
+            for node in prg.nodes():
+                for result_type in prg.nodes[node]:
                     if result_type == ResultType.OWNER_CHANGE:
                         continue
-                    elif prg.g.nodes[node][result_type] > self.minimum_profit_amount:
+                    elif prg.nodes[node][result_type] > self.minimum_profit_amount:
                         results.append({
                             "profit_node": node,
                             "result_type": result_type,
-                            "amount": prg.g.nodes[node][result_type]
+                            "amount": prg.nodes[node][result_type]
                         })
 
             if len(results) > 0:
                 tx.is_attack = True
 
                 # compute whole transaction economic lost
-                rg = ResultGraph.build_result_graph(action_tree)
+                rg = result_graph
                 lost = list()
                 for node in rg.g.nodes():
                     for result_type in rg.g.nodes[node]:

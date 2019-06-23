@@ -64,23 +64,23 @@ class CallInjectionChecker(Checker):
             # only consider the direct trace result graph when "delegatecall"
             direct_trace = True if call_type == "delegatecall" else False
             prg = ResultGraph.build_partial_result_graph(
-                action_tree, e[0], direct_trace)
+                result_graph.t, e[0], direct_trace)
 
             results = list()
-            for node in prg.g.nodes():
+            for node in prg.nodes():
                 if node not in ancestors:
                     continue
-                for result_type in prg.g.nodes[node]:
+                for result_type in prg.nodes[node]:
                     if result_type == ResultType.OWNER_CHANGE:
                         results.append({
                             "profit_node": node,
                             "result_type": result_type,
                         })
-                    elif prg.g.nodes[node][result_type] > 0:
+                    elif prg.nodes[node][result_type] > 0:
                         results.append({
                             "profit_node": node,
                             "result_type": result_type,
-                            "amount": prg.g.nodes[node][result_type]
+                            "amount": prg.nodes[node][result_type]
                         })
 
             if len(results) > 0:

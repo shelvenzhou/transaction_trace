@@ -28,15 +28,15 @@ class AirdropHuntingChecker(Checker):
         hunting_time = list()
         # search partial-result-graph for each candidate
         for n in candidates:
-            prg = ResultGraph.build_partial_result_graph(action_tree, n)
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, n)
 
             results = list()
-            for node in prg.g.nodes():
-                if ResultType.TOKEN_TRANSFER in prg.g.nodes[node] and prg.g.nodes[node][ResultType.TOKEN_TRANSFER] > 0:
+            for node in prg.nodes():
+                if ResultType.TOKEN_TRANSFER in prg.nodes[node] and prg.nodes[node][ResultType.TOKEN_TRANSFER] > 0:
                     results.append({
                         "profit_node": node,
                         "result_type": ResultType.TOKEN_TRANSFER,
-                        "amount": prg.g.nodes[node][ResultType.TOKEN_TRANSFER]
+                        "amount": prg.nodes[node][ResultType.TOKEN_TRANSFER]
                     })
 
             if len(results) > 0:

@@ -29,15 +29,15 @@ class IntegerOverflowChecker(Checker):
         tx = action_tree.tx
         # search partial-result-graph for each candidate
         for (edge, func_name) in candidates:
-            prg = ResultGraph.build_partial_result_graph(action_tree, edge[0])
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, edge[0], True)
 
             results = list()
-            for e in prg.g.edges():
-                if ResultType.TOKEN_TRANSFER in prg.g.edges[e] and prg.g.edges[e][ResultType.TOKEN_TRANSFER] > self.threshold:
+            for e in prg.edges():
+                if ResultType.TOKEN_TRANSFER in prg.edges[e] and prg.edges[e][ResultType.TOKEN_TRANSFER] > self.threshold:
                     results.append({
                         'edge': e,
                         'result_type': ResultType.TOKEN_TRANSFER,
-                        'amount': prg.g.edges[e][ResultType.TOKEN_TRANSFER]
+                        'amount': prg.edges[e][ResultType.TOKEN_TRANSFER]
                     })
 
             if len(results) > 0:
