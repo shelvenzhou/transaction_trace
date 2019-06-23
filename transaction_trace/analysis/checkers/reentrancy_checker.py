@@ -49,7 +49,7 @@ class ReentrancyChecker(Checker):
 
     def check_transaction(self, action_tree, result_graph):
         edges = action_tree.t.edges()
-        if len(edges) < self.threshold:
+        if len(edges) < 2 * self.threshold:
             return
 
         # build call graph to find cycles
