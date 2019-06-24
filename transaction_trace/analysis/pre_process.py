@@ -1,9 +1,11 @@
 import logging
 import sys
+import os
 from collections import defaultdict
 
 from .intermediate_representations import ActionTree, ResultGraph
 from .trace_analysis import TraceAnalysis
+from ..local import DatabaseName
 
 l = logging.getLogger("transaction-trace.analysis.PreProcess")
 
@@ -11,8 +13,18 @@ l = logging.getLogger("transaction-trace.analysis.PreProcess")
 class PreProcess(TraceAnalysis):
     def __init__(self, db_folder, log_file=sys.stdout):
         super(PreProcess, self).__init__(db_folder, log_file)
+        # super(PreProcess, self).__init__(db_folder, log_file, [
+        #     DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
 
     def preprocess(self):
+        # token_transfers = defaultdict(list)
+        # for conn in self.database[DatabaseName.TOKEN_TRANSFER_DATABASE].get_all_connnections():
+        #     l.info("token transfers: %s", conn)
+        #     for row in conn.read('token_transfers', '*'):
+        #         tx_hash = row['transaction_hash']
+        #         token_transfers[tx_hash].append(row)
+
+        # for conn in self.database[DatabaseName.TRACE_DATABASE].get_all_connnections():
         for conn in self.database.get_all_connnections():
             l.info("construct for %s", conn)
 
@@ -34,7 +46,8 @@ class PreProcess(TraceAnalysis):
 
             for tx_hash in traces:
                 l.debug("construct action tree for %s", tx_hash)
-                tree = ActionTree.build_action_tree(tx_hash, traces[tx_hash], subtraces[tx_hash])
+                tree = ActionTree.build_action_tree(
+                    tx_hash, traces[tx_hash], subtraces[tx_hash])
                 if tree is not None:
                     l.debug("construct result graph for %s", tx_hash)
                     graph = ResultGraph.build_result_graph(tree)

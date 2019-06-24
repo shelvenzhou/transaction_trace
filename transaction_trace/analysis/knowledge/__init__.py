@@ -1,1 +1,1 @@
-from .sensitive_apis import SensitiveAPIs
+from .sensitive_apis import SensitiveAPIs, extract_function_signature

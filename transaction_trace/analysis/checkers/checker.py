@@ -9,12 +9,16 @@ class CheckerType:
 
 class Checker:
 
-    def __init__(self, log_file=sys.stdout):
-        self.log_file = log_file
+    def __init__(self, checker_name):
+        self.checker_name = checker_name
 
     @property
     def name(self):
-        raise NotImplementedError
+        return self.checker_name
+
+    @property
+    def minimum_profit_amount(self):
+        return 0.00001
 
     @property
     def checker_type(self):
@@ -37,13 +41,3 @@ class Checker:
         and attack contract for further filter.
         """
         raise NotImplementedError
-
-    def record_abnormal_detail(self, *args):
-        if len(args) == 1:
-            print(args[0], file=self.log_file)
-        else:
-            date = args[0]
-            abnormal_type = args[1]
-            detail = args[2]
-            print("[%s][%s]: %s" %
-                  (date, abnormal_type, detail), file=self.log_file)
