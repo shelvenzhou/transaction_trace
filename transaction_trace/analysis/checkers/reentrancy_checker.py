@@ -36,13 +36,15 @@ class ReentrancyChecker(Checker):
         walked_edges = set()
         while walk['trace_id'] in call_traces:
             e = call_traces[walk['trace_id']]['edge']
-            if e in walked_edges:
+
+            walked_edges.add(e)
+            if len(walked_edges) == len(edges):
                 turns_count += 1
                 walked_edges.clear()
 
-            walked_edges.add(e)
             walk['edge'] = e
             walk['trace_id'] = call_traces[walk['trace_id']]['parent_trace_id']
+
 
         entry = "%s:%s" % (walk['trace_id'], walk['edge'][0])
         return entry, turns_count
@@ -119,6 +121,7 @@ class ReentrancyChecker(Checker):
                 tx.attack_details.append({
                     "checker": self.name,
                     "entry": entry,
+                    "turns_count": turns_count,
                     "results": results,
                     "lost": lost
                 })
