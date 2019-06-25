@@ -4,6 +4,7 @@ from collections import defaultdict
 from ..datetime_utils import str_to_time, time_to_str
 from .trace_analysis import TraceAnalysis
 from .trace_util import TraceUtil
+from .knowledge.sensitive_apis import SensitiveAPIs
 
 l = logging.getLogger("transaction-trace.analysis.CallAfterDestruct")
 
@@ -17,34 +18,42 @@ class CallAfterDestruct(TraceAnalysis):
 
         dead_contracts = defaultdict(dict)
         # call_after_destruct = defaultdict(dict)
-        for db_conn in self.database.get_connections(from_time, to_time):
-            for row in db_conn.read_traces():
-                call_after_destruct = dict()
-                if row["status"] == 0:
+        for conn in self.database.get_connections(from_time, to_time):
+            l.info("construct for %s", conn)
+            traces = defaultdict(list)
+            for row in conn.read_traces(with_rowid=True):
+                if row['trace_type'] not in ('call', 'create', 'suicide'):
+                    l.info("ignore trace of type %s", row['trace_type'])
                     continue
-                if row["trace_type"] == "suicide":
-                    dead_contracts[row["from_address"]
-                                   ]["death_time"] = time_to_str(row["block_timestamp"])
-                    dead_contracts[row["from_address"]
-                                   ]["death_tx"] = row["transaction_hash"]
-                elif row["to_address"] in dead_contracts and time_to_str(row["block_timestamp"]) > dead_contracts[row["to_address"]]["death_time"] and row["to_address"] not in call_after_destruct:
-                    callee = TraceUtil.get_callee(row['trace_type'], row['input'])
-                    call_after_destruct[row["to_address"]] = {
-                        "death_time": dead_contracts[row["to_address"]]["death_time"],
-                        "death_tx": dead_contracts[row["to_address"]]["death_tx"],
-                        "call_time": time_to_str(row["block_timestamp"]),
-                        "call_tx": row["transaction_hash"]
-                    }
-                    l.info("CallAfterDestruct found for contract: %s death time: %s call time: %s",
-                           row["to_address"], call_after_destruct[row["to_address"]]["death_time"], call_after_destruct[row["to_address"]]["call_time"])
-                    detail = {
-                        "date": db_conn.date,
-                        "abnormal_type": ABNORMAL_TYPE,
-                        "contract": row["to_address"],
-                        "death time": call_after_destruct[row["to_address"]]["death_time"],
-                        "death tx": call_after_destruct[row["to_address"]]["death_tx"],
-                        "call time": call_after_destruct[row["to_address"]]["call_time"],
-                        "call tx": call_after_destruct[row["to_address"]]["call_tx"],
-                        "callee": callee
-                    }
-                    self.record_abnormal_detail(detail)
+                tx_hash = row['transaction_hash']
+                traces[tx_hash].append(row)
+
+            for tx_hash in traces:
+                call_after_destruct = list()
+                for trace in traces[tx_hash]:
+                    if trace["status"] == 0:
+                        continue
+                    if trace["trace_type"] == "suicide":
+                        dead_contracts[trace["from_address"]] = {
+                            "death_time": time_to_str(trace["block_timestamp"]),
+                            "death_tx": tx_hash
+                        }
+                    elif trace["trace_type"] == "call" and trace["to_address"] in dead_contracts and time_to_str(trace["block_timestamp"]) > dead_contracts[trace["to_address"]]["death_time"]:
+                        callee = SensitiveAPIs.func_name(trace["input"])
+                        if SensitiveAPIs.sensitive_function_call(trace["input"]):
+                            callee = SensitiveAPIs.func_name(trace["input"])
+                            detail = {
+                                "contract": trace["to_address"],
+                                "death_time": dead_contracts[trace["to_address"]]["death_time"],
+                                "death_tx": dead_contracts[trace["to_address"]]["death_tx"],
+                                "callee": callee
+                            }
+                            call_after_destruct.append(detail)
+
+                if len(call_after_destruct) > 0:
+                    l.info("CallAfterDestruct found for tx: %s", tx_hash)
+                    self.record_abnormal_detail({
+                        "tx_hash": tx_hash,
+                        "time": time_to_str(traces[tx_hash][0]["block_timestamp"]),
+                        "detail": call_after_destruct
+                    })

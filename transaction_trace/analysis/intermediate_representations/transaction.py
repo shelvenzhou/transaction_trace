@@ -25,6 +25,6 @@ class Transaction:
             'tx_hash': self.tx_hash,
             'block_timestamp': time_to_str(self.block_timestamp),
             'caller': self.caller,
-            'attack_detials': self.attack_details
+            'attack_detaills': self.attack_details
         }
         return str(tx_detail)
