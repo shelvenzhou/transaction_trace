@@ -45,7 +45,6 @@ class ReentrancyChecker(Checker):
             walk['edge'] = e
             walk['trace_id'] = call_traces[walk['trace_id']]['parent_trace_id']
 
-
         entry = "%s:%s" % (walk['trace_id'], walk['edge'][0])
         return entry, turns_count
 
@@ -85,43 +84,53 @@ class ReentrancyChecker(Checker):
                 candidates.append((entry, turns_count))
 
         tx = action_tree.tx
+        attacks = list()
+        sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (entry, turns_count) in candidates:
             prg = ResultGraph.build_partial_result_graph(result_graph.t, entry)
 
             results = list()
-            for node in prg.nodes():
-                for result_type in prg.nodes[node]:
+            for e in prg.edges():
+                for result_type in prg.edges[e]:
                     if result_type == ResultType.OWNER_CHANGE:
                         continue
-                    elif prg.nodes[node][result_type] > self.minimum_profit_amount:
+                    elif prg.edges[e][result_type] > self.minimum_profit_amount:
                         results.append({
-                            "profit_node": node,
+                            "edge": e,
                             "result_type": result_type,
-                            "amount": prg.nodes[node][result_type]
+                            "amount": prg.edges[e][result_type]
                         })
+                        sensitive_nodes.add(e[1])
 
             if len(results) > 0:
-                tx.is_attack = True
-
-                # compute whole transaction economic lost
-                rg = result_graph
-                lost = list()
-                for node in rg.g.nodes():
-                    for result_type in rg.g.nodes[node]:
-                        if result_type == ResultType.OWNER_CHANGE:
-                            continue
-                        elif rg.g.nodes[node][result_type] < -self.minimum_profit_amount:
-                            lost.append({
-                                "node": node,
-                                "result_type": result_type,
-                                "amount": rg.g.nodes[node][result_type]
-                            })
-
-                tx.attack_details.append({
-                    "checker": self.name,
+                attacks.append({
                     "entry": entry,
                     "turns_count": turns_count,
-                    "results": results,
-                    "lost": lost
+                    "results": results
+                })
+
+        if len(attacks) > 0:
+            tx.is_attack = True
+
+            # compute whole transaction economic lost
+            rg = result_graph
+            profit = list()
+            for node in rg.g.nodes():
+                if node not in sensitive_nodes:
+                    continue
+                for result_type in rg.g.nodes[node]:
+                    if result_type == ResultType.OWNER_CHANGE:
+                        continue
+                    elif rg.g.nodes[node][result_type] > self.minimum_profit_amount:
+                        profit.append({
+                            "node": node,
+                            "result_type": result_type,
+                            "amount": rg.g.nodes[node][result_type]
+                        })
+            if len(profit) > 0:
+                tx.attack_details.append({
+                    "checker": self.name,
+                    "attack": attacks,
+                    "profit": profit
                 })

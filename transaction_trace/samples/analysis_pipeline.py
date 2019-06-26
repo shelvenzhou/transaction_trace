@@ -20,7 +20,7 @@ def main(db_folder, log_path):
         tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
         tca.register_transaction_centric_checker(ReentrancyChecker(5))
 
-        cca = ContractCentricAnalysis()
+        # cca = ContractCentricAnalysis()
 
         for call_tree, result_graph in p.preprocess():
             tca.do_analysis(call_tree, result_graph)
