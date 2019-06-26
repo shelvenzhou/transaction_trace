@@ -36,7 +36,8 @@ class CallAfterDestruct(TraceAnalysis):
                     if trace["trace_type"] == "suicide":
                         dead_contracts[trace["from_address"]] = {
                             "death_time": time_to_str(trace["block_timestamp"]),
-                            "death_tx": tx_hash
+                            "death_tx": tx_hash,
+                            "value": trace["value"]
                         }
                     elif trace["trace_type"] == "call" and trace["to_address"] in dead_contracts and time_to_str(trace["block_timestamp"]) > dead_contracts[trace["to_address"]]["death_time"]:
                         callee = SensitiveAPIs.func_name(trace["input"])
@@ -46,7 +47,16 @@ class CallAfterDestruct(TraceAnalysis):
                                 "contract": trace["to_address"],
                                 "death_time": dead_contracts[trace["to_address"]]["death_time"],
                                 "death_tx": dead_contracts[trace["to_address"]]["death_tx"],
-                                "callee": callee
+                                "callee": callee,
+                                "value": trace["value"]
+                            }
+                            call_after_destruct.append(detail)
+                        elif trace["value"] > 0:
+                            detail = {
+                                "contract": trace["to_address"],
+                                "death_time": dead_contracts[trace["to_address"]]["death_time"],
+                                "death_tx": dead_contracts[trace["to_address"]]["death_tx"],
+                                "value": trace["value"]
                             }
                             call_after_destruct.append(detail)
 
