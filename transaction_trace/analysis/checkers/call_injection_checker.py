@@ -53,11 +53,13 @@ class CallInjectionChecker(Checker):
                                     input_control = True
 
             if self_loop and input_control:
-                candidates.append(e)
+                candidates.append((e, parent_edge))
 
         tx = action_tree.tx
+        attacks = list()
+        sensitive_nodes = set()
         # search partial-result-graph for each candidate
-        for e in candidates:
+        for (e, parent_edge) in candidates:
             ancestors = get_ancestors_from_tree(action_tree.t, e[0])
             call_type = action_tree.t.edges[e]['call_type']
 
@@ -67,26 +69,56 @@ class CallInjectionChecker(Checker):
                 result_graph.t, e[0], direct_trace)
 
             results = list()
-            for node in prg.nodes():
-                if node not in ancestors:
+            for e in prg.edges():
+                if e[1] not in ancestors:
                     continue
-                for result_type in prg.nodes[node]:
+                for result_type in prg.edges[e]:
                     if result_type == ResultType.OWNER_CHANGE:
                         results.append({
-                            "profit_node": node,
+                            "edge": e,
                             "result_type": result_type,
                         })
-                    elif prg.nodes[node][result_type] > 0:
+                    elif prg.edges[e][result_type] > self.minimum_profit_amount:
                         results.append({
-                            "profit_node": node,
+                            "edge": e,
                             "result_type": result_type,
-                            "amount": prg.nodes[node][result_type]
+                            "amount": prg.edges[e][result_type]
                         })
+                    else:
+                        continue
+                    sensitive_nodes.add(e[1])
 
             if len(results) > 0:
-                tx.is_attack = True
+                attacks.append({
+                    "edge": parent_edge,
+                    "result": results
+                })
+
+        if len(attacks) > 0:
+            tx.is_attack = True
+
+            # compute whole transaction economic lost
+            rg = result_graph
+            profit = list()
+            for node in rg.g.nodes():
+                if node not in sensitive_nodes:
+                    continue
+                for result_type in rg.g.nodes[node]:
+                    if result_type == ResultType.OWNER_CHANGE:
+                        profit.append({
+                            "node": node,
+                            "result_type": result_type
+                        })
+                    elif rg.g.nodes[node][result_type] > self.minimum_profit_amount:
+                        profit.append({
+                            "node": node,
+                            "result_type": result_type,
+                            "amount": rg.g.nodes[node][result_type]
+                            })
+
+            if len(profit) > 0:
                 tx.attack_details.append({
                     "checker": self.name,
-                    "edge": e,
-                    "results": results
+                    "attack": attacks,
+                    "profit": profit
                 })
