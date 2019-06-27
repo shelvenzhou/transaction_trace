@@ -1,4 +1,7 @@
 import sys
+from web3 import Web3
+
+from ..intermediate_representations import ResultType
 
 
 class CheckerType:
@@ -18,7 +21,10 @@ class Checker:
 
     @property
     def minimum_profit_amount(self):
-        return 0.00001
+        return {
+            ResultType.ETHER_TRANSFER: Web3.toWei(0.00001, 'ether'),
+            ResultType.TOKEN_TRANSFER: 100
+        }
 
     @property
     def checker_type(self):

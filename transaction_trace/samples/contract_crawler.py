@@ -28,6 +28,8 @@ async def main(db_filepath, api_key_filepath, addrs_filepath):
             print('not valid address')
         else:
             contract = await r.get_contract_info(addr)
+            if contract == None:
+                continue
             l.insert_contract([contract[x] for x in ContractCode.key_order])
             print(count, 'left')
 

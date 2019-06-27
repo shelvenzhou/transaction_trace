@@ -6,6 +6,7 @@ class Database:
     def __init__(self, db_filepath, date, inner_db="sqlite3", **args):
         self._filepath = db_filepath
         self._date = date
+        self.inner_db = inner_db
 
         if inner_db == "sqlite3":
             conn = sqlite3.connect(
@@ -36,17 +37,18 @@ class Database:
 
     def read(self, table, columns, conditions="", args=dict()):
         cur = self._conn.cursor()
-        return cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)
+        re = cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)
+        return re if self.inner_db == 'sqlite3' else cur.fetchall()
 
     def insert(self, table, columns, placeholders, row):
         cur = self._conn.cursor()
         cur.execute(
-            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", row)
+            f"INSERT INTO {table}{columns} VALUES ({placeholders})", row)
 
     def batch_insert(self, table, columns, placeholders, rows):
         cur = self._conn.cursor()
         cur.executemany(
-            f"INSERT INTO {table}({columns}) VALUES ({placeholders})", rows)
+            f"INSERT INTO {table}{columns} VALUES ({placeholders})", rows)
 
     def delete(self, table, conditions="", args=dict()):
         cur = self._conn.cursor()

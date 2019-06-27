@@ -28,4 +28,4 @@ class TransactionCentricAnalysis(TraceAnalysis):
         if tx.is_attack:
             l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
                 set([attack['checker'] for attack in tx.attack_details])))
-            # self.record_abnormal_detail(tx.to_string())
+            self.record_abnormal_detail(tx.to_string())

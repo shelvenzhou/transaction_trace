@@ -27,24 +27,28 @@ class IntegerOverflowChecker(Checker):
                 candidates.append((e, func_name))
 
         tx = action_tree.tx
+        attacks = list()
         # search partial-result-graph for each candidate
         for (edge, func_name) in candidates:
             prg = ResultGraph.build_partial_result_graph(result_graph.t, edge[0], True)
 
             results = list()
             for e in prg.edges():
-                if ResultType.TOKEN_TRANSFER in prg.edges[e] and prg.edges[e][ResultType.TOKEN_TRANSFER] > self.threshold:
-                    results.append({
-                        'edge': e,
-                        'result_type': ResultType.TOKEN_TRANSFER,
-                        'amount': prg.edges[e][ResultType.TOKEN_TRANSFER]
-                    })
+                if ResultType.TOKEN_TRANSFER in prg.edges[e]:
+                    for token in prg.edges[e][ResultType.TOKEN_TRANSFER]:
+                        if prg.edges[e][ResultType.TOKEN_TRANSFER][token] > self.threshold:
+                            results.append((token, prg.edges[e][ResultType.TOKEN_TRANSFER][token]))
 
             if len(results) > 0:
-                tx.is_attack = True
-                tx.attack_details.append({
-                    'checker': self.name,
+                attacks.append({
                     'edge': edge,
                     'func_name': func_name,
                     'results': results
                 })
+
+        if len(attacks) > 0:
+            tx.is_attack = True
+            tx.attack_details.append({
+                'checker': self.name,
+                'attacks': attacks
+            })

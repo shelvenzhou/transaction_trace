@@ -4,13 +4,14 @@ from collections import defaultdict
 from ..local import ContractTransactions
 from .trace_analysis import TraceAnalysis
 from .checkers import CheckerType
+from ..datetime_utils import time_to_str
 
 l = logging.getLogger("transaction-trace.analysis.ContractCentricAnalysis")
 
 
 class ContractCentricAnalysis(TraceAnalysis):
 
-    def __init__(self, idx_db_user="contract_txs_idx", idx_db_passwd="password", idx_db="contract_txs_idx", log_file):
+    def __init__(self, log_file, idx_db_user="contract_txs_idx", idx_db_passwd="orzorz", idx_db="contract_txs_idx"):
         super(ContractCentricAnalysis, self).__init__(log_file=log_file)
         self.tx_index_db = ContractTransactions("", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
 
@@ -25,9 +26,11 @@ class ContractCentricAnalysis(TraceAnalysis):
             return
 
         for checker_name, checker in self.checkers.items():
-            checker.check_transaction(tx, self.tx_index_db)
+            checker.check_contract(tx, self.tx_index_db)
 
         if tx.is_attack:
+            l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
+                set([attack['checker'] for attack in tx.attack_details])))
             self.record_abnormal_detail(tx.to_string())
 
 
