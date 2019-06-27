@@ -3,6 +3,8 @@ from ..intermediate_representations.action_tree import extract_address_from_node
 from ..intermediate_representations.result_graph import ResultGraph, ResultType
 from ..knowledge import SensitiveAPIs, extract_function_signature
 
+from collections import defaultdict
+
 
 class CallInjectionChecker(Checker):
 
@@ -68,22 +70,15 @@ class CallInjectionChecker(Checker):
             prg = ResultGraph.build_partial_result_graph(
                 result_graph.t, e[0], direct_trace)
 
-            results = list()
+            results = defaultdict(dict)
             for e in prg.edges():
                 if e[1] not in ancestors:
                     continue
                 for result_type in prg.edges[e]:
                     if result_type == ResultType.OWNER_CHANGE:
-                        results.append({
-                            "edge": e,
-                            "result_type": result_type,
-                        })
+                        results[e][result_type] = None
                     elif prg.edges[e][result_type] > self.minimum_profit_amount:
-                        results.append({
-                            "edge": e,
-                            "result_type": result_type,
-                            "amount": prg.edges[e][result_type]
-                        })
+                        results[e][result_type] = prg.edges[e][result_type]
                     else:
                         continue
                     sensitive_nodes.add(e[1])
@@ -91,34 +86,26 @@ class CallInjectionChecker(Checker):
             if len(results) > 0:
                 attacks.append({
                     "edge": parent_edge,
-                    "result": results
+                    "results": results
                 })
 
         if len(attacks) > 0:
-            tx.is_attack = True
-
             # compute whole transaction economic lost
             rg = result_graph
-            profit = list()
+            profit = defaultdict(dict)
             for node in rg.g.nodes():
                 if node not in sensitive_nodes:
                     continue
                 for result_type in rg.g.nodes[node]:
                     if result_type == ResultType.OWNER_CHANGE:
-                        profit.append({
-                            "node": node,
-                            "result_type": result_type
-                        })
+                        profit[node][result_type] = None
                     elif rg.g.nodes[node][result_type] > self.minimum_profit_amount:
-                        profit.append({
-                            "node": node,
-                            "result_type": result_type,
-                            "amount": rg.g.nodes[node][result_type]
-                            })
+                        profit[node][result_type] = rg.g.nodes[node][result_type]
 
             if len(profit) > 0:
+                tx.is_attack = True
                 tx.attack_details.append({
                     "checker": self.name,
-                    "attack": attacks,
+                    "attacks": attacks,
                     "profit": profit
                 })

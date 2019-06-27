@@ -5,7 +5,7 @@ import time
 
 import transaction_trace
 from transaction_trace.analysis import TransactionCentricAnalysis, ContractCentricAnalysis, PreProcess
-from transaction_trace.analysis.checkers import CallInjectionChecker, AirdropHuntingChecker, IntegerOverflowChecker, ReentrancyChecker
+from transaction_trace.analysis.checkers import CallInjectionChecker, AirdropHuntingChecker, IntegerOverflowChecker, ReentrancyChecker, ProfitChecker
 
 l = logging.getLogger('driver')
 
@@ -20,10 +20,19 @@ def main(db_folder, log_path):
         tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
         tca.register_transaction_centric_checker(ReentrancyChecker(5))
 
-        # cca = ContractCentricAnalysis()
+        cca = ContractCentricAnalysis(log_file)
+        cca.register_contract_centric_checker(ProfitChecker(db_folder))
 
+        candidates = list()
         for call_tree, result_graph in p.preprocess():
             tca.do_analysis(call_tree, result_graph)
+            if call_tree.tx.is_attack == True:
+                candidates.append(call_tree.tx)
+
+        for tx in candidates:
+            cca.do_analysis(tx)
+
+
 
 
 if __name__ == '__main__':

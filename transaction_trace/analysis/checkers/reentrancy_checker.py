@@ -3,6 +3,7 @@ from ..intermediate_representations.action_tree import extract_address_from_node
 from ..intermediate_representations.result_graph import ResultGraph, ResultType
 
 import networkx as nx
+from collections import defaultdict
 
 
 class ReentrancyChecker(Checker):
@@ -90,17 +91,13 @@ class ReentrancyChecker(Checker):
         for (entry, turns_count) in candidates:
             prg = ResultGraph.build_partial_result_graph(result_graph.t, entry)
 
-            results = list()
+            results = defaultdict(dict)
             for e in prg.edges():
                 for result_type in prg.edges[e]:
                     if result_type == ResultType.OWNER_CHANGE:
                         continue
                     elif prg.edges[e][result_type] > self.minimum_profit_amount:
-                        results.append({
-                            "edge": e,
-                            "result_type": result_type,
-                            "amount": prg.edges[e][result_type]
-                        })
+                        results[e][result_type] = prg.edges[e][result_type]
                         sensitive_nodes.add(e[1])
 
             if len(results) > 0:
@@ -111,11 +108,9 @@ class ReentrancyChecker(Checker):
                 })
 
         if len(attacks) > 0:
-            tx.is_attack = True
-
             # compute whole transaction economic lost
             rg = result_graph
-            profit = list()
+            profit = defaultdict(dict)
             for node in rg.g.nodes():
                 if node not in sensitive_nodes:
                     continue
@@ -123,14 +118,11 @@ class ReentrancyChecker(Checker):
                     if result_type == ResultType.OWNER_CHANGE:
                         continue
                     elif rg.g.nodes[node][result_type] > self.minimum_profit_amount:
-                        profit.append({
-                            "node": node,
-                            "result_type": result_type,
-                            "amount": rg.g.nodes[node][result_type]
-                        })
+                        profit[node][result_type] = rg.g.nodes[node][result_type]
             if len(profit) > 0:
+                tx.is_attack = True
                 tx.attack_details.append({
                     "checker": self.name,
-                    "attack": attacks,
+                    "attacks": attacks,
                     "profit": profit
                 })
