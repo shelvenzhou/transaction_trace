@@ -228,7 +228,7 @@ class SingleTransactionDatabase(Database):
             table="transactions",
             columns="",
             placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
-            rows=row)
+            row=row)
 
     def insert_txs(self, rows):
         self.batch_insert(
@@ -263,7 +263,7 @@ class SingleTokenTransferDatabase(Database):
             table="token_transfers",
             columns="",
             placeholders="? ,?, ?, ?, ? ,?, ?, ?, ?",
-            rows=row
+            row=row
         )
 
     def insert_token_transfers(self, rows):
@@ -277,7 +277,7 @@ class SingleTokenTransferDatabase(Database):
 
 class SingleContractDatabase(Database):
     def __init__(self, db_filepath, date):
-        return super(SingleContractDatabase, self).__init__(db_filepath, date)
+        super(SingleContractDatabase, self).__init__(db_filepath, date)
 
     def create_contracts_table(self):
         self.create_table(
@@ -299,7 +299,7 @@ class SingleContractDatabase(Database):
             table="contracts",
             columns="",
             placeholders="?, ?, ?, ?, ?, ?, ?, ?",
-            rows=row
+            row=row
         )
 
     def insert_contracts(self, rows):

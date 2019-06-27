@@ -69,30 +69,55 @@ class ResultGraph:
                 if result_type == ResultType.ETHER_TRANSFER:
                     src = extract_address_from_node(e[0])
                     dst = extract_address_from_node(e[1])
+                    if src == dst:
+                        continue
                     amount = result_tree.edges[e][result_type]
-
                     graph.add_edge(src, dst)
+
                     if result_type not in graph[src][dst]:
                         graph[src][dst][result_type] = amount
-                        graph.nodes[src][result_type] = -amount
-                        graph.nodes[dst][result_type] = amount
                     else:
                         graph[src][dst][result_type] += amount
+
+                    if result_type not in graph.nodes[src]:
+                        graph.nodes[src][result_type] = -amount
+                    else:
                         graph.nodes[src][result_type] -= amount
+
+                    if result_type not in graph.nodes[dst]:
+                        graph.nodes[dst][result_type] = amount
+                    else:
                         graph.nodes[dst][result_type] += amount
+
 
                 elif result_type == ResultType.TOKEN_TRANSFER:
-                    (src, dst, amount) = result_tree.edges[e][result_type]
+                    token_address = extract_address_from_node(e[1])
 
+                    (src, dst, amount) = result_tree.edges[e][result_type]
+                    if src == dst:
+                        continue
                     graph.add_edge(src, dst)
+
                     if result_type not in graph[src][dst]:
-                        graph[src][dst][result_type] = amount
-                        graph.nodes[src][result_type] = -amount
-                        graph.nodes[dst][result_type] = amount
+                        graph[src][dst][result_type] = {token_address: amount}
+                    elif token_address not in graph[src][dst][result_type]:
+                        graph[src][dst][result_type][token_address] = amount
                     else:
-                        graph[src][dst][result_type] += amount
-                        graph.nodes[src][result_type] -= amount
-                        graph.nodes[dst][result_type] += amount
+                        graph[src][dst][result_type][token_address] += amount
+
+                    if result_type not in graph.nodes[src]:
+                        graph.nodes[src][result_type] = {token_address: -amount}
+                    elif token_address not in graph.nodes[src][result_type]:
+                        graph.nodes[src][result_type][token_address] = -amount
+                    else:
+                        graph.nodes[src][result_type][token_address] -= amount
+
+                    if result_type not in graph.nodes[dst]:
+                        graph.nodes[dst][result_type] = {token_address: amount}
+                    elif token_address not in graph.nodes[dst][result_type]:
+                        graph.nodes[dst][result_type][token_address] = amount
+                    else:
+                        graph.nodes[dst][result_type][token_address] += amount
 
                 else:  # ResultType.OWNER_CHANGE
                     (src, dst, _) = result_tree.edges[e][result_type]

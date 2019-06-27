@@ -1,6 +1,8 @@
 from .checker import Checker, CheckerType
 from ..intermediate_representations.result_graph import ResultGraph, ResultType
 
+from collections import defaultdict
+
 
 class AirdropHuntingChecker(Checker):
 
@@ -32,20 +34,38 @@ class AirdropHuntingChecker(Checker):
 
             results = list()
             for node in prg.nodes():
-                if ResultType.TOKEN_TRANSFER in prg.nodes[node] and prg.nodes[node][ResultType.TOKEN_TRANSFER] > 0:
-                    results.append({
-                        "profit_node": node,
-                        "result_type": ResultType.TOKEN_TRANSFER,
-                        "amount": prg.nodes[node][ResultType.TOKEN_TRANSFER]
-                    })
+                if ResultType.TOKEN_TRANSFER in prg.nodes[node]:
+                    for token in prg.nodes[node][ResultType.TOKEN_TRANSFER]:
+                        if prg.nodes[node][ResultType.TOKEN_TRANSFER][token] > 0:
+                            results.append({
+                                "profit_node": node,
+                                "result_type": ResultType.TOKEN_TRANSFER,
+                                "token_address": token,
+                                "amount": prg.nodes[node][ResultType.TOKEN_TRANSFER]
+                            })
 
             if len(results) > 0:
                 hunting_time.append(results)
 
         if len(hunting_time) > self.threshold:
-            tx.is_attack = True
-            tx.attack_details.append({
-                "checker": self.name,
-                "hunting_time": len(hunting_time),
-                "results": hunting_time
-            })
+            rg = result_graph
+            profits = dict()
+            for node in rg.g.nodes():
+                profit = dict()
+                if ResultType.TOKEN_TRANSFER in rg.g.nodes[node]:
+                    for token in rg.g.nodes[node][ResultType.TOKEN_TRANSFER]:
+                        if rg.g.nodes[node][ResultType.TOKEN_TRANSFER][token] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
+                            if ResultType.TOKEN_TRANSFER not in profit:
+                                profit[ResultType.TOKEN_TRANSFER] = list()
+                            profit[ResultType.TOKEN_TRANSFER].append(
+                                (token, rg.g.nodes[node][ResultType.TOKEN_TRANSFER][token]))
+                if len(profit) > 0:
+                    profits[node] = profit
+
+            if len(profits) > 0:
+                tx.is_attack = True
+                tx.attack_details.append({
+                    "checker": self.name,
+                    "hunting_time": len(hunting_time),
+                    "profit": profits
+                })

@@ -19,7 +19,7 @@ class Etherscan:
             contract = (await self.client.contract.contract_source_code(addr))[0]
         except Exception as e:
             print(e)
-            return
+            return None
         contract['ContractAddress'] = addr
 
         return contract

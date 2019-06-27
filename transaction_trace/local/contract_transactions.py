@@ -34,11 +34,11 @@ class ContractTransactions(Database):
 
     def insert_transactions_of_contract(self, tx_hash, date, contracts, sensitive):
         rows = [(contract, date, tx_hash, sensitive) for contract in contracts]
-        self.batch_insert("contract_transactions", "contract, transaction_date, transaction_hash, sensitive_result", "%s, %s, %s, %s", rows)
+        self.batch_insert("contract_transactions", "(contract, transaction_date, transaction_hash, sensitive_result)", "%s, %s, %s, %s", rows)
 
     def read_transactions_of_contract(self, contract):
         rows = self.read("contract_transactions", "transaction_date, transaction_hash", "WHERE contract=%s", (contract,))
         txs = defaultdict(list)
         for row in rows:
-            txs[date_to_str(row["transaction_date"])].append(row["transaction_hash"])
+            txs[date_to_str(row[0])].append(row[1])
         return txs

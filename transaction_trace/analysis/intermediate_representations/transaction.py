@@ -1,4 +1,4 @@
-from ...datetime_utils import time_to_str
+from ...datetime_utils import time_to_str, str_to_time
 
 
 class Transaction:
@@ -25,6 +25,13 @@ class Transaction:
             'tx_hash': self.tx_hash,
             'block_timestamp': time_to_str(self.block_timestamp),
             'caller': self.caller,
-            'attack_detaills': self.attack_details
+            'attack_details': self.attack_details
         }
         return str(tx_detail)
+
+    @staticmethod
+    def from_dict(d):
+        tx = Transaction(d['tx_hash'], None, None, str_to_time(d['block_timestamp']), None, d['caller'])
+        tx.is_attack = True
+        tx.attack_details = d['attack_details']
+        return tx

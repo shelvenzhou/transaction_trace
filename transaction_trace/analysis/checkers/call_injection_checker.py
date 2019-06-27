@@ -70,37 +70,59 @@ class CallInjectionChecker(Checker):
             prg = ResultGraph.build_partial_result_graph(
                 result_graph.t, e[0], direct_trace)
 
-            results = defaultdict(dict)
+            results = dict()
             for e in prg.edges():
                 if e[1] not in ancestors:
                     continue
+                result = dict()
                 for result_type in prg.edges[e]:
                     if result_type == ResultType.OWNER_CHANGE:
-                        results[e][result_type] = None
-                    elif prg.edges[e][result_type] > self.minimum_profit_amount:
-                        results[e][result_type] = prg.edges[e][result_type]
+                        result[result_type] = None
+                    elif result_type == ResultType.ETHER_TRANSFER:
+                        if prg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
+                            result[result_type] = prg.edges[e][result_type]
+                    elif result_type == ResultType.TOKEN_TRANSFER:
+                        for token in prg.edges[e][result_type]:
+                            if prg.edges[e][result_type][token] > self.minimum_profit_amount[result_type]:
+                                if ResultType.TOKEN_TRANSFER not in result:
+                                    result[ResultType.TOKEN_TRANSFER] = list()
+                                result[result_type].append(
+                                    (token, prg.edges[e][result_type][token]))
                     else:
                         continue
+                if len(result) > 0:
+                    results[e] = result
                     sensitive_nodes.add(e[1])
 
             if len(results) > 0:
                 attacks.append({
                     "edge": parent_edge,
-                    "results": results
+                    'results': results
                 })
 
         if len(attacks) > 0:
             # compute whole transaction economic lost
             rg = result_graph
-            profit = defaultdict(dict)
+            profits = dict()
             for node in rg.g.nodes():
                 if node not in sensitive_nodes:
                     continue
+                profit = dict()
                 for result_type in rg.g.nodes[node]:
                     if result_type == ResultType.OWNER_CHANGE:
-                        profit[node][result_type] = None
-                    elif rg.g.nodes[node][result_type] > self.minimum_profit_amount:
-                        profit[node][result_type] = rg.g.nodes[node][result_type]
+                        profit[result_type] = None
+                    elif result_type == ResultType.ETHER_TRANSFER:
+                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[result_type]:
+                            profit[result_type] = rg.g.nodes[node][result_type]
+                    else:
+                        for token in rg.g.nodes[node][result_type]:
+                            if rg.g.nodes[node][result_type][token] > self.minimum_profit_amount[result_type]:
+                                if result_type not in profit:
+                                    profit[result_type] = list()
+                                profit[result_type].append(
+                                    (token, rg.g.nodes[node][result_type][token]))
+                if len(profit) > 0:
+                    profits[node] = profit
 
             if len(profit) > 0:
                 tx.is_attack = True
