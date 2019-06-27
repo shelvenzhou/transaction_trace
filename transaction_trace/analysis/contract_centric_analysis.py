@@ -2,14 +2,16 @@ import logging
 from collections import defaultdict
 
 from ..local import ContractTransactions
+from .trace_analysis import TraceAnalysis
 from .checkers import CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.ContractCentricAnalysis")
 
 
-class ContractCentricAnalysis:
+class ContractCentricAnalysis(TraceAnalysis):
 
-    def __init__(self, idx_db_user="contract_txs_idx", idx_db_passwd="password", idx_db="contract_txs_idx"):
+    def __init__(self, idx_db_user="contract_txs_idx", idx_db_passwd="password", idx_db="contract_txs_idx", log_file):
+        super(ContractCentricAnalysis, self).__init__(log_file=log_file)
         self.tx_index_db = ContractTransactions("", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
 
         self.checkers = dict()
@@ -17,6 +19,18 @@ class ContractCentricAnalysis:
     def register_contract_centric_checker(self, checker):
         assert checker.checker_type == CheckerType.CONTRACT_CENTRIC, "try to register a checker of wrong type"
         self.checkers[checker.name] = checker
+
+    def do_analysis(self, tx):
+        if not tx.is_attack:
+            return
+
+        for checker_name, checker in self.checkers.items():
+            checker.check_transaction(tx, self.tx_index_db)
+
+        if tx.is_attack:
+            self.record_abnormal_detail(tx.to_string())
+
+
 
     def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=100000):
         self.tx_index_db.create_contract_transactions_table()
