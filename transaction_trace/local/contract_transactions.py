@@ -29,9 +29,7 @@ class ContractTransactions(Database):
     def create_contract_index(self):
         cur = self._conn.cursor()
         cur.execute("""
-            CREATE INDEX IF NO EXISTS contract_index ON contract_transactions(
-                contract
-            )
+            ALTER TABLE contract_transactions ADD INDEX contract_index (contract(42))
         """)
 
     def insert_transactions_of_contract(self, tx_hash, date, contracts, sensitive):
