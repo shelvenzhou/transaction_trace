@@ -26,7 +26,7 @@ class ContractCentricAnalysis(TraceAnalysis):
             return
 
         for checker_name, checker in self.checkers.items():
-            checker.check_contract(tx, self.tx_index_db)
+            checker.check_transaction(tx, self.tx_index_db)
 
         if tx.is_attack:
             l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(

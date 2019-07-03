@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 import time
+import pickle
 
 import transaction_trace
 from transaction_trace.analysis.intermediate_representations import Transaction
@@ -15,6 +16,9 @@ def main(db_folder, log_path, input_log_file=None):
     p = PreProcess(db_folder)
 
     with open(os.path.join(log_path, "smart-contract-analyzer-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+") as log_file:
+        with open('/home/xiangjie/txs', 'rb') as f:
+            txs = pickle.load(f)
+
         candidates = list()
         if input_log_file == None:
             tca = TransactionCentricAnalysis(log_file)
@@ -23,8 +27,10 @@ def main(db_folder, log_path, input_log_file=None):
             tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
             tca.register_transaction_centric_checker(ReentrancyChecker(5))
 
-            for call_tree, result_graph in p.preprocess():
+            for call_tree, result_graph in p.preprocess(txs):
                 if call_tree == None:
+                    continue
+                if call_tree.tx.tx_hash not in txs:
                     continue
                 tca.do_analysis(call_tree, result_graph)
                 if call_tree.tx.is_attack == True:

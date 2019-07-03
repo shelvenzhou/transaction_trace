@@ -129,5 +129,5 @@ class CallInjectionChecker(Checker):
                 tx.attack_details.append({
                     "checker": self.name,
                     "attacks": attacks,
-                    "profit": profit
+                    "profit": profits
                 })

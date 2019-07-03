@@ -16,7 +16,7 @@ class PreProcess(TraceAnalysis):
         # super(PreProcess, self).__init__(db_folder, log_file, [
         #     DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
 
-    def preprocess(self):
+    def preprocess(self, txs):
         # token_transfers = defaultdict(list)
         # for conn in self.database[DatabaseName.TOKEN_TRANSFER_DATABASE].get_all_connnections():
         #     l.info("token transfers: %s", conn)
@@ -45,6 +45,8 @@ class PreProcess(TraceAnalysis):
                 subtraces[tx_hash][trace_id] = parent_trace_id
 
             for tx_hash in traces:
+                if tx_hash not in txs:
+                    continue
                 l.debug("construct action tree for %s", tx_hash)
                 tree = ActionTree.build_action_tree(
                     tx_hash, traces[tx_hash], subtraces[tx_hash])
