@@ -79,13 +79,20 @@ def _extract_function_parameters(func_name, input_data):
     try:
         res = decode_abi(paras, bytes.fromhex(input_data[10:]))
     except Exception as e:
-        l.exception("")
+        l.exception(e)
         return None
 
     return res
 
 
 class SensitiveAPIs:
+
+    _integer_overflow_sensitive_functions = {
+        'transferMulti(address[],uint256[])',
+        'transferProxy(address,address,uint256,uint256,uint8,bytes32,bytes32)',
+        'batchTransfer(address[],uint256)',
+        'multiTransfer(address[],uint256[])'
+    }
 
     _sensitive_functions = {
         'owner': {
@@ -159,11 +166,11 @@ class SensitiveAPIs:
 
     @classmethod
     def owner_change_functions(cls):
-        return cls.encoded_functions['owner']
+        return cls._encoded_functions['owner']
 
     @classmethod
     def token_transfer_functions(cls):
-        return cls.encoded_functions['token']
+        return cls._encoded_functions['token']
 
     @classmethod
     def sensitive_function_call(cls, input_data):

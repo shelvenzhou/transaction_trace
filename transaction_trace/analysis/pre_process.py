@@ -12,21 +12,25 @@ l = logging.getLogger("transaction-trace.analysis.PreProcess")
 
 class PreProcess(TraceAnalysis):
     def __init__(self, db_folder, log_file=sys.stdout):
-        super(PreProcess, self).__init__(db_folder, log_file)
-        # super(PreProcess, self).__init__(db_folder, log_file, [
-        #     DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
+        super(PreProcess, self).__init__(db_folder, log_file, [
+            DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
 
     def preprocess(self, txs):
-        # token_transfers = defaultdict(list)
-        # for conn in self.database[DatabaseName.TOKEN_TRANSFER_DATABASE].get_all_connnections():
-        #     l.info("token transfers: %s", conn)
-        #     for row in conn.read('token_transfers', '*'):
-        #         tx_hash = row['transaction_hash']
-        #         token_transfers[tx_hash].append(row)
+        token_transfers = defaultdict(list)
+        for conn in self.database[DatabaseName.TOKEN_TRANSFER_DATABASE].get_all_connnections():
+            l.info("token transfers: %s", conn)
+            for row in conn.read('token_transfers', '*'):
+                tx_hash = row['transaction_hash']
+                token_transfers[tx_hash].append(row)
 
-        # for conn in self.database[DatabaseName.TRACE_DATABASE].get_all_connnections():
         for conn in self.database.get_all_connnections():
             l.info("construct for %s", conn)
+
+            token_conn = self.database[DatabaseName.TRACE_DATABASE].get_connection(conn.date)
+            token_transfers = dict()
+            for row in token_conn.read('token_transfers', '*'):
+                tx_hash = row['transaction_hash']
+                token_transfers[tx_hash] = row
 
             traces = defaultdict(dict)
             for row in conn.read_traces(with_rowid=True):
@@ -52,7 +56,7 @@ class PreProcess(TraceAnalysis):
                     tx_hash, traces[tx_hash], subtraces[tx_hash])
                 if tree is not None:
                     l.debug("construct result graph for %s", tx_hash)
-                    graph = ResultGraph.build_result_graph(tree)
+                    graph = ResultGraph.build_result_graph(tree, token_transfers[tx_hash] if tx_hash in token_transfers else None)
 
                     yield tree, graph
 

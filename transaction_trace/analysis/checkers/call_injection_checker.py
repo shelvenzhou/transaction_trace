@@ -1,6 +1,5 @@
 from .checker import Checker, CheckerType
-from ..intermediate_representations.action_tree import extract_address_from_node, get_ancestors_from_tree
-from ..intermediate_representations.result_graph import ResultGraph, ResultType
+from ..intermediate_representations import ActionTree, ResultGraph, ResultType, extract_address_from_node
 from ..knowledge import SensitiveAPIs, extract_function_signature
 
 from collections import defaultdict
@@ -62,7 +61,7 @@ class CallInjectionChecker(Checker):
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (e, parent_edge) in candidates:
-            ancestors = get_ancestors_from_tree(action_tree.t, e[0])
+            ancestors = ActionTree.get_ancestors_from_tree(action_tree.t, e[0])
             call_type = action_tree.t.edges[e]['call_type']
 
             # only consider the direct trace result graph when "delegatecall"
@@ -76,18 +75,15 @@ class CallInjectionChecker(Checker):
                     continue
                 result = dict()
                 for result_type in prg.edges[e]:
-                    if result_type == ResultType.OWNER_CHANGE:
+                    rt = ResultGraph.extract_result_type(result_type)
+                    if rt == ResultType.OWNER_CHANGE:
                         result[result_type] = None
-                    elif result_type == ResultType.ETHER_TRANSFER:
-                        if prg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
+                    elif rt == ResultType.ETHER_TRANSFER:
+                        if prg.edges[e][result_type] > self.minimum_profit_amount[rt]:
                             result[result_type] = prg.edges[e][result_type]
-                    elif result_type == ResultType.TOKEN_TRANSFER:
-                        for token in prg.edges[e][result_type]:
-                            if prg.edges[e][result_type][token] > self.minimum_profit_amount[result_type]:
-                                if ResultType.TOKEN_TRANSFER not in result:
-                                    result[ResultType.TOKEN_TRANSFER] = list()
-                                result[result_type].append(
-                                    (token, prg.edges[e][result_type][token]))
+                    elif rt == ResultType.TOKEN_TRANSFER:
+                        if prg.edges[e][result_type] > self.minimum_profit_amount[rt]:
+                            result[result_type] = prg.edges[e][result_type]
                     else:
                         continue
                 if len(result) > 0:
@@ -109,18 +105,15 @@ class CallInjectionChecker(Checker):
                     continue
                 profit = dict()
                 for result_type in rg.g.nodes[node]:
-                    if result_type == ResultType.OWNER_CHANGE:
+                    rt = ResultGraph.extract_result_type(result)
+                    if rt == ResultType.OWNER_CHANGE:
                         profit[result_type] = None
-                    elif result_type == ResultType.ETHER_TRANSFER:
-                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[result_type]:
+                    elif rt == ResultType.ETHER_TRANSFER:
+                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[rt]:
                             profit[result_type] = rg.g.nodes[node][result_type]
-                    else:
-                        for token in rg.g.nodes[node][result_type]:
-                            if rg.g.nodes[node][result_type][token] > self.minimum_profit_amount[result_type]:
-                                if result_type not in profit:
-                                    profit[result_type] = list()
-                                profit[result_type].append(
-                                    (token, rg.g.nodes[node][result_type][token]))
+                    elif rt == ResultType.TOKEN_TRANSFER_EVENT:
+                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[rt]:
+                            profit[result_type] = rg.g.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 

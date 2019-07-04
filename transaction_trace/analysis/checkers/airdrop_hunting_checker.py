@@ -1,6 +1,5 @@
 from .checker import Checker, CheckerType
-from ..intermediate_representations.result_graph import ResultGraph, ResultType
-
+from ..intermediate_representations import ResultGraph, ResultType
 from collections import defaultdict
 
 
@@ -34,15 +33,15 @@ class AirdropHuntingChecker(Checker):
 
             results = list()
             for node in prg.nodes():
-                if ResultType.TOKEN_TRANSFER in prg.nodes[node]:
-                    for token in prg.nodes[node][ResultType.TOKEN_TRANSFER]:
-                        if prg.nodes[node][ResultType.TOKEN_TRANSFER][token] > 0:
-                            results.append({
-                                "profit_node": node,
-                                "result_type": ResultType.TOKEN_TRANSFER,
-                                "token_address": token,
-                                "amount": prg.nodes[node][ResultType.TOKEN_TRANSFER]
-                            })
+                for result_type in prg.nodes[node]:
+                    if ResultGraph.extract_result_type(result_type) != ResultType.TOKEN_TRANSFER:
+                        continue
+                    if prg.nodes[node][result_type] > 0:
+                        results.append({
+                            "profit_node": node,
+                            "result_type": result_type,
+                            "amount": prg.nodes[node][result_type]
+                        })
 
             if len(results) > 0:
                 hunting_time.append(results)
@@ -52,13 +51,11 @@ class AirdropHuntingChecker(Checker):
             profits = dict()
             for node in rg.g.nodes():
                 profit = dict()
-                if ResultType.TOKEN_TRANSFER in rg.g.nodes[node]:
-                    for token in rg.g.nodes[node][ResultType.TOKEN_TRANSFER]:
-                        if rg.g.nodes[node][ResultType.TOKEN_TRANSFER][token] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
-                            if ResultType.TOKEN_TRANSFER not in profit:
-                                profit[ResultType.TOKEN_TRANSFER] = list()
-                            profit[ResultType.TOKEN_TRANSFER].append(
-                                (token, rg.g.nodes[node][ResultType.TOKEN_TRANSFER][token]))
+                if result_type in rg.g.nodes[node]:
+                    if ResultGraph.extract_result_type(result_type) != ResultType.TOKEN_TRANSFER_EVENT:
+                        continue
+                    if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
+                        profit[result_type] = rg.g.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 
