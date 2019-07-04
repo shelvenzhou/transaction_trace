@@ -6,3 +6,4 @@ class DatabaseName:
     TOKEN_TRANSFER_DATABASE = 'ethereum_token_transfers'
     CONTRACT_DATABASE = 'ethereum_contracts'
     CONTRACT_TRANSACTIONS_DATABASE = 'contract_transactions'
+    LOG_DATABASE = 'ethereum_logs'
