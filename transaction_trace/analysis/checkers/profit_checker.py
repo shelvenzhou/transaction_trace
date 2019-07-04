@@ -1,7 +1,6 @@
 from .checker import Checker, CheckerType
-from ..intermediate_representations import ResultType
-from ...local.ethereum_database import EthereumDatabase
-from ..knowledge.sensitive_apis import SensitiveAPIs, extract_function_signature
+from ..intermediate_representations import ResultType, ResultGraph
+from ...local import DatabaseName
 from ...datetime_utils import date_to_str, time_to_str
 
 from collections import defaultdict
@@ -9,76 +8,99 @@ import logging
 
 l = logging.getLogger("transaction-trace.analysis.checkers.ProfitChecker")
 
+
+def check_time_interval(begin_time, end_time, date, time):
+    if begin_time < date < end_time:
+        return True
+    elif date == begin_time[:10] and time > begin_time:
+        return True
+    elif date == end_time[:10] and time < end_time:
+        return True
+    else:
+        return False
+
+
 class ProfitChecker(Checker):
 
-    def __init__(self, db_folder):
+    def __init__(self):
         super(ProfitChecker, self).__init__("profit-checker")
-        self.trace_db = EthereumDatabase(db_folder)
         self.income_cache = defaultdict(dict)
+        self.database = None
 
     @property
     def checker_type(self):
         return CheckerType.CONTRACT_CENTRIC
 
-    def check_contract_income_forward(self, db, contract, account, timestamp, income_type, token=None):
-        encoded_income_type = income_type
-        if token != None:
-            encoded_income_type = f"{income_type}:{token}"
-
+    def check_contract_income_forward(self, contract, account, timestamp, income_type):
+        rt = ResultGraph.extract_result_type(income_type)
+        if rt == ResultType.TOKEN_TRANSFER_EVENT:
+            token_address = ResultGraph.extract_token_address(income_type)
         income = 0
         time = '2015-08-07 00:00:00'
-        if contract in self.income_cache and account in self.income_cache[contract] and encoded_income_type in self.income_cache[contract][account]:
-            for t in self.income_cache[contract][account][encoded_income_type]:
+        if contract in self.income_cache and account in self.income_cache[contract] and income_type in self.income_cache[contract][account]:
+            for t in self.income_cache[contract][account][income_type]:
                 if t <= timestamp and t > time:
                     time = t
-                    income = self.income_cache[contract][account][encoded_income_type][t]
+                    income = self.income_cache[contract][account][income_type][t]
 
         if income != 0:
-            l.info("income_cache matched: %s %s %s %s", contract, account, timestamp, income_type)
+            l.info("income_cache matched: %s %s %s %s",
+                   contract, account, time, income_type)
 
-        txs = db.read_transactions_of_contract(contract)
+        txs = self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE].read_transactions_of_contract(
+            contract)
+        l.info("%d transactions for %s", len(txs), contract)
         for date in txs:
             if date > timestamp[:10] or date < time[:10]:
                 continue
-            con = self.trace_db.get_connection(date)
-            traces = defaultdict(list)
-            for row in con.read_traces():
-                if row['trace_type'] not in ('call', 'create', 'suicide'):
-                    continue
-                tx_hash = row['transaction_hash']
-                traces[tx_hash].append(row)
 
-            for tx_hash in traces:
-                if date == timestamp[:10] and time_to_str(traces[tx_hash][0]['block_timestamp']) >= timestamp:
-                    continue
-                if date == time[:10] and time_to_str(traces[tx_hash][0]['block_timestamp']) <= time:
-                    continue
-                for trace in traces[tx_hash]:
-                    if trace['status'] == 0:
+            if rt == ResultType.ETHER_TRANSFER:
+                trace_con = self.database[DatabaseName.TRACE_DATABASE].get_connection(
+                    date)
+                traces = defaultdict(list)
+                for row in trace_con.read('traces', "transaction_hash, from_address, to_address, value, status, block_timestamp"):
+                    if row['trace_type'] not in ('call', 'create', 'suicide'):
                         continue
+                    tx_hash = row['transaction_hash']
+                    traces[tx_hash].append(row)
 
-                    if income_type == ResultType.ETHER_TRANSFER and account in (trace['from_address'], trace['to_address']) and trace['value'] > 0:
-                        if trace['from_address'] == contract:
-                            income -= trace['value']
-                        elif trace['to_address'] == contract:
-                            income += trace['value']
-                    elif income_type == ResultType.TOKEN_TRANSFER:
-                        callee = extract_function_signature(trace['input'])
-                        if callee not in SensitiveAPIs._sensitive_functions['token']:
+                for tx_hash in traces:
+                    if not check_time_interval(time, timestamp, date, time_to_str(traces[tx_hash][0]['block_timestamp'])):
+                        continue
+                    for trace in traces[tx_hash]:
+                        if trace['status'] == 0:
                             continue
-                        token_address = trace['to_address']
-                        if token_address != token:
+
+                        if account in (trace['from_address'], trace['to_address']) and trace['value'] > 0:
+                            if trace['from_address'] == contract:
+                                income -= trace['value']
+                            elif trace['to_address'] == contract:
+                                income += trace['value']
+            elif rt == ResultType.TOKEN_TRANSFER_EVENT:
+                token_transfer_con = self.database[DatabaseName.TOKEN_TRANSFER_DATABASE].get_connection(
+                    date)
+                token_transfers = defaultdict(list)
+                for row in token_transfer_con.read('token_transfers', '*'):
+                    tx_hash = row['transaction_hash']
+                    token_transfers[tx_hash].append(row)
+
+                for tx_hash in token_transfers:
+                    if not check_time_interval(time, timestamp, date, time_to_str(token_transfers[tx_hash][0]['block_timestamp'])):
+                        continue
+                    for token_transfer in token_transfers[tx_hash]:
+                        if token_transfer['token_address'] != token_address:
                             continue
-                        for result_type, src, dst, amount in SensitiveAPIs.get_result_details(trace):
-                            if result_type == ResultType.TOKEN_TRANSFER:
-                                if src == contract and dst == account:
-                                    income -= amount
-                                elif dst == contract and src == account:
-                                    income += amount
+                        src = token_transfer['from_address']
+                        dst = token_transfer['to_address']
+                        amount = token_address['value']
+                        if src == contract and dst == account:
+                            income -= amount
+                        elif dst == contract and src == account:
+                            income += amount
 
         if account not in self.income_cache[contract]:
             self.income_cache[contract][account] = defaultdict(dict)
-        self.income_cache[contract][account][encoded_income_type][timestamp] = income
+        self.income_cache[contract][account][income_type][timestamp] = income
 
         return income
 
@@ -86,47 +108,50 @@ class ProfitChecker(Checker):
         # extract candidate attack profits for call-injection & reentrancy from raw result
         candidates = dict()
         for checker_result in attack_details:
-            if checker_result['checker'] not in ('reentrancy, call-injection'):
+            if checker_result['checker'] not in ('reentrancy', 'call-injection', 'integer-overflow'):
                 continue
 
             candidate_profits = defaultdict(dict)
             for node in checker_result['profit']:
                 for result_type in checker_result['profit'][node]:
-                    if result_type == ResultType.ETHER_TRANSFER:
-                        candidate_profits[node][result_type] = {
-                            'victims': set(),
-                            'amount': checker_result['profit'][node][result_type]
-                        }
-                    elif result_type == ResultType.TOKEN_TRANSFER:
-                        candidate_profits[node][result_type] = dict()
-                        for row in checker_result['profit'][node][result_type]:
-                            token = row[0]
-                            candidate_profits[node][result_type][token] = {
-                                'victims': set(),
-                                'amount': row[1]
-                            }
+                    candidate_profits[node][result_type] = {
+                        'victims': set(),
+                        'amount': checker_result['profit'][node][result_type]
+                    }
 
             for attack in checker_result['attacks']:
                 for e in attack['results']:
                     profit_node = e[1]
                     victim_node = e[0]
 
+                    if profit_node not in checker_result['profit']:
+                        continue
                     for result_type in attack['results'][e]:
-                        if profit_node in checker_result['profit'] and result_type in checker_result['profit'][profit_node]:
-                            if result_type == ResultType.ETHER_TRANSFER:
-                                candidate_profits[profit_node][result_type]['victims'].add(
+                        rt = ResultGraph.extract_result_type(result_type)
+                        if rt == ResultType.ETHER_TRANSFER and rt in checker_result['profit'][profit_node]:
+                            candidate_profits[profit_node][result_type]['victims'].add(
+                                victim_node)
+                        elif rt == ResultType.TOKEN_TRANSFER:
+                            token_address = ResultGraph.extract_token_address(
+                                result_type)
+                            ert = f"{ResultType.TOKEN_TRANSFER_EVENT}:{token_address}"
+                            if ert in checker_result['profit'][profit_node]:
+                                candidate_profits[profit_node][ert]['victims'].add(
                                     victim_node)
-                            elif result_type == ResultType.TOKEN_TRANSFER:
-                                for row in attack['results'][e][result_type]:
-                                    token = row[0]
-                                    if token in candidate_profits[profit_node][result_type]:
-                                        candidate_profits[profit_node][result_type][token]['victims'].add(
-                                            victim_node)
+
             candidates[checker_result['checker']] = candidate_profits
 
         return candidates
 
-    def check_transaction(self, tx, db):
+    def do_check(self, txs, db):
+        if self.database == None:
+            self.database = db
+        for tx in txs:
+            if tx.is_attack == False:
+                continue
+            self.check_transaction(tx)
+
+    def check_transaction(self, tx):
         # extract the candidate attack profits
         candidates = self.extract_profit_candidates(tx.attack_details)
 
@@ -136,28 +161,15 @@ class ProfitChecker(Checker):
             for profit_node in candidates[checker]:
                 net_profits = dict()
                 for result_type in candidates[checker][profit_node]:
-                    if result_type == ResultType.ETHER_TRANSFER:
-                        outlay = 0
-                        for victim in candidates[checker][profit_node][result_type]['victims']:
-                            outlay += self.check_contract_income_forward(
-                                db, victim, profit_node, time_to_str(tx.block_timestamp), result_type)
+                    outlay = 0
+                    for victim in candidates[checker][profit_node][result_type]['victims']:
+                        outlay += self.check_contract_income_forward(
+                            victim, profit_node, time_to_str(tx.block_timestamp), result_type)
 
-                        net_profit = candidates[checker][profit_node][result_type]['amount'] - outlay
-                        if net_profit > 0:
-                            net_profits[result_type] = net_profit
-                    elif result_type == ResultType.TOKEN_TRANSFER:
-                        token_net_profits = dict()
-                        for token in candidates[checker][profit_node][result_type]:
-                            outlay = 0
-                            for victim in candidates[checker][profit_node][result_type][token]['victims']:
-                                outlay += self.check_contract_income_forward(
-                                    db, victim, profit_node, time_to_str(tx.block_timestamp), result_type, token)
+                    net_profit = candidates[checker][profit_node][result_type]['amount'] - outlay
+                    if net_profit > 0:
+                        net_profits[result_type] = net_profit
 
-                            net_profit = candidates[checker][profit_node][result_type][token]['amount'] - outlay
-                            if net_profit > 0:
-                                token_net_profits[token] = net_profit
-                        if len(token_net_profits) > 0:
-                            net_profits[result_type] = token_net_profits
                 if len(net_profits) > 0:
                     attack_net_profit[checker][profit_node] = net_profits
 

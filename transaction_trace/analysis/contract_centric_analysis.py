@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from ..local import ContractTransactions
+from ..local import ContractTransactions, DatabaseName
 from .trace_analysis import TraceAnalysis
 from .checkers import CheckerType
 from ..datetime_utils import time_to_str
@@ -11,9 +11,12 @@ l = logging.getLogger("transaction-trace.analysis.ContractCentricAnalysis")
 
 class ContractCentricAnalysis(TraceAnalysis):
 
-    def __init__(self, log_file, idx_db_user="contract_txs_idx", idx_db_passwd="orzorz", idx_db="contract_txs_idx"):
-        super(ContractCentricAnalysis, self).__init__(log_file=log_file)
-        self.tx_index_db = ContractTransactions("", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
+    def __init__(self, db_folder, log_file, idx_db_user="contract_txs_idx", idx_db_passwd="orzorz", idx_db="contract_txs_idx"):
+        super(ContractCentricAnalysis, self).__init__(db_folder, log_file, [
+            DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
+        tx_index_db = ContractTransactions(
+            "", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
+        self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE] = tx_index_db
 
         self.checkers = dict()
 
@@ -21,22 +24,19 @@ class ContractCentricAnalysis(TraceAnalysis):
         assert checker.checker_type == CheckerType.CONTRACT_CENTRIC, "try to register a checker of wrong type"
         self.checkers[checker.name] = checker
 
-    def do_analysis(self, tx):
-        if not tx.is_attack:
-            return
-
+    def do_analysis(self, txs):
         for checker_name, checker in self.checkers.items():
-            checker.check_transaction(tx, self.tx_index_db)
+            checker.do_check(txs, self.database)
 
-        if tx.is_attack:
-            l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
-                set([attack['checker'] for attack in tx.attack_details])))
-            self.record_abnormal_detail(tx.to_string())
-
-
+        for tx in txs:
+            if tx.is_attack:
+                l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
+                    set([attack['checker'] for attack in tx.attack_details])))
+                self.record_abnormal_detail(tx.to_string())
 
     def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=100000):
-        self.tx_index_db.create_contract_transactions_table()
+        tx_index_db = self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE]
+        tx_index_db.create_contract_transactions_table()
 
         db_cache = list()
 
@@ -74,14 +74,14 @@ class ContractCentricAnalysis(TraceAnalysis):
             if len(db_cache) > db_cache_len:
                 l.info("insert data from cache to database")
                 for d in db_cache:
-                    self.tx_index_db.insert_transactions_of_contract(*d)
+                    tx_index_db.insert_transactions_of_contract(*d)
 
-                self.tx_index_db.commit()
+                tx_index_db.commit()
                 db_cache.clear()
 
         for d in db_cache:
-            self.tx_index_db.insert_transactions_of_contract(*d)
-        self.tx_index_db.commit()
+            tx_index_db.insert_transactions_of_contract(*d)
+        tx_index_db.commit()
 
         if column_index:
-            self.tx_index_db.create_contract_index()
+            tx_index_db.create_contract_index()

@@ -8,7 +8,8 @@ from . import ResultType
 from .action_tree import extract_address_from_node
 from .transaction import Transaction
 
-l = logging.getLogger("transaction-trace.analysis.intermediate_representations.ResultGraph")
+l = logging.getLogger(
+    "transaction-trace.analysis.intermediate_representations.ResultGraph")
 
 
 class SensitiveResult:
@@ -28,6 +29,33 @@ class ResultGraph:
         self.tx = tx
         self.t = tree
         self.g = graph
+
+    @staticmethod
+    def extract_token_address(token_result_type):
+        return token_result_type.split(':')[1]
+
+    @staticmethod
+    def extract_result_type(result_type):
+        return result_type.split(':')[0]
+
+    @staticmethod
+    def append_result_to_graph(src, dst, amount, result_type, graph):
+        graph.add_edge(src, dst)
+
+        if result_type not in graph[src][dst]:
+            graph[src][dst][result_type] = amount
+        else:
+            graph[src][dst][result_type] += amount
+
+        if result_type not in graph.nodes[src]:
+            graph.nodes[src][result_type] = -amount
+        else:
+            graph.nodes[src][result_type] -= amount
+
+        if result_type not in graph.nodes[dst]:
+            graph.nodes[dst][result_type] = amount
+        else:
+            graph.nodes[dst][result_type] += amount
 
     @staticmethod
     def build_result_tree(action_tree):
@@ -72,23 +100,9 @@ class ResultGraph:
                     if src == dst:
                         continue
                     amount = result_tree.edges[e][result_type]
-                    graph.add_edge(src, dst)
 
-                    if result_type not in graph[src][dst]:
-                        graph[src][dst][result_type] = amount
-                    else:
-                        graph[src][dst][result_type] += amount
-
-                    if result_type not in graph.nodes[src]:
-                        graph.nodes[src][result_type] = -amount
-                    else:
-                        graph.nodes[src][result_type] -= amount
-
-                    if result_type not in graph.nodes[dst]:
-                        graph.nodes[dst][result_type] = amount
-                    else:
-                        graph.nodes[dst][result_type] += amount
-
+                    ResultGraph.append_result_to_graph(
+                        src, dst, amount, result_type, graph)
 
                 elif result_type == ResultType.TOKEN_TRANSFER:
                     token_address = extract_address_from_node(e[1])
@@ -98,26 +112,9 @@ class ResultGraph:
                         continue
                     graph.add_edge(src, dst)
 
-                    if result_type not in graph[src][dst]:
-                        graph[src][dst][result_type] = {token_address: amount}
-                    elif token_address not in graph[src][dst][result_type]:
-                        graph[src][dst][result_type][token_address] = amount
-                    else:
-                        graph[src][dst][result_type][token_address] += amount
-
-                    if result_type not in graph.nodes[src]:
-                        graph.nodes[src][result_type] = {token_address: -amount}
-                    elif token_address not in graph.nodes[src][result_type]:
-                        graph.nodes[src][result_type][token_address] = -amount
-                    else:
-                        graph.nodes[src][result_type][token_address] -= amount
-
-                    if result_type not in graph.nodes[dst]:
-                        graph.nodes[dst][result_type] = {token_address: amount}
-                    elif token_address not in graph.nodes[dst][result_type]:
-                        graph.nodes[dst][result_type][token_address] = amount
-                    else:
-                        graph.nodes[dst][result_type][token_address] += amount
+                    token_result_type = f"{result_type}:{token_address}"
+                    ResultGraph.append_result_to_graph(
+                        src, dst, amount, token_result_type, graph)
 
                 else:  # ResultType.OWNER_CHANGE
                     (src, dst, _) = result_tree.edges[e][result_type]
@@ -129,13 +126,21 @@ class ResultGraph:
         return graph
 
     @staticmethod
-    def build_result_graph(action_tree):
+    def build_result_graph(action_tree, token_transfers=None):
         root = [n for n, d in action_tree.t.in_degree() if d == 0]
         if len(root) > 1:
-            l.warning("more than one root in action tree of %s", action_tree.tx.tx_hash)
+            l.warning("more than one root in action tree of %s",
+                      action_tree.tx.tx_hash)
             import IPython
             IPython.embed()
 
         result_tree = ResultGraph.build_result_tree(action_tree)
         graph = ResultGraph.build_partial_result_graph(result_tree, root[0])
+
+        if token_transfers != None:
+            for row in token_transfers:
+                token_result_type = f"{ResultType.TOKEN_TRANSFER_EVENT}:{row['token_address']}"
+                ResultGraph.append_result_to_graph(
+                    row['from_address'], row['to_address'], row['value'], token_result_type, graph)
+
         return ResultGraph(action_tree.tx, result_tree, graph)

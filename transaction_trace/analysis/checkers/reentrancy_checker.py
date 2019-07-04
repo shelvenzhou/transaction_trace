@@ -1,6 +1,5 @@
 from .checker import Checker, CheckerType
-from ..intermediate_representations.action_tree import extract_address_from_node, extract_trace_id_from_node, get_edges_from_cycle
-from ..intermediate_representations.result_graph import ResultGraph, ResultType
+from ..intermediate_representations import ActionTree, get_edges_from_cycle, extract_address_from_node, ResultGraph, ResultType
 
 import networkx as nx
 from collections import defaultdict
@@ -66,8 +65,8 @@ class ReentrancyChecker(Checker):
                 g[from_address][to_address]["call_traces"] = list()
 
             g[from_address][to_address]["call_traces"].append({
-                "trace_id": extract_trace_id_from_node(e[1]),
-                "parent_trace_id": extract_trace_id_from_node(e[0]),
+                "trace_id": ActionTree.extract_trace_id_from_node(e[1]),
+                "parent_trace_id": ActionTree.extract_trace_id_from_node(e[0]),
                 "height": len(trace["trace_address"]) if trace["trace_address"] != None else 0,
             })
 
@@ -95,18 +94,15 @@ class ReentrancyChecker(Checker):
             for e in prg.edges():
                 result = dict()
                 for result_type in prg.edges[e]:
-                    if result_type == ResultType.OWNER_CHANGE:
+                    rt = ResultGraph.extract_result_type(result)
+                    if rt == ResultType.OWNER_CHANGE:
                         continue
-                    elif result_type == ResultType.ETHER_TRANSFER:
+                    elif rt == ResultType.ETHER_TRANSFER:
                         if prg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
                             result[result_type] = prg.edges[e][result_type]
-                    elif result_type == ResultType.TOKEN_TRANSFER:
-                        for token in prg.edges[e][result_type]:
-                            if prg.edges[e][result_type][token] > self.minimum_profit_amount[result_type]:
-                                if ResultType.TOKEN_TRANSFER not in result:
-                                    result[ResultType.TOKEN_TRANSFER] = list()
-                                result[result_type].append(
-                                    (token, prg.edges[e][result_type][token]))
+                    elif rt == ResultType.TOKEN_TRANSFER:
+                        if prg.edges[e][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
+                            result[result_type] = prg.edges[e][result_type]
                 if len(result) > 0:
                     results[e] = result
                     sensitive_nodes.add(e[1])
@@ -128,18 +124,15 @@ class ReentrancyChecker(Checker):
                     continue
                 profit = dict()
                 for result_type in rg.g.nodes[node]:
-                    if result_type == ResultType.OWNER_CHANGE:
+                    rt = ResultGraph.extract_result_type(result)
+                    if rt == ResultType.OWNER_CHANGE:
                         continue
-                    elif result_type == ResultType.ETHER_TRANSFER:
+                    elif rt == ResultType.ETHER_TRANSFER:
                         if rg.g.nodes[node][result_type] > self.minimum_profit_amount[result_type]:
                             profit[result_type] = rg.g.nodes[node][result_type]
-                    else:
-                        for token in rg.g.nodes[node][result_type]:
-                            if rg.g.nodes[node][result_type][token] > self.minimum_profit_amount[result_type]:
-                                if result_type not in profit:
-                                    profit[result_type] = list()
-                                profit[result_type].append(
-                                    (token, rg.g.nodes[node][result_type][token]))
+                    elif rt == ResultType.TOKEN_TRANSFER_EVENT:
+                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER_EVENT]:
+                            profit[result_type] = rg.g.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 

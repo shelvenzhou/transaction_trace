@@ -3,16 +3,6 @@ import networkx as nx
 from .transaction import Transaction
 
 
-def encode_node(trace_id, address):
-    return str(trace_id) + ":" + address
-
-
-def extract_address_from_node(node):
-    return node.split(":")[1]
-
-def extract_trace_id_from_node(node):
-    return node.split(":")[0]
-
 def get_edges_from_cycle(cycle):
     edges = []
     for i in range(1, len(cycle)):
@@ -20,17 +10,14 @@ def get_edges_from_cycle(cycle):
     edges.append((cycle[-1], cycle[0]))
     return edges
 
-def get_ancestors_from_tree(tree, entry):
-    ancestors = set()
-    while entry != None:
-        parent_edges = list(tree.in_edges(entry))
-        if len(parent_edges) == 0:
-            entry = None
-        else:
-            entry = parent_edges[0][0]
-            node = extract_address_from_node(entry)
-            ancestors.add(node)
-    return ancestors
+def encode_node(trace_id, address):
+    return str(trace_id) + ":" + address
+
+def extract_address_from_node(node):
+    return node.split(":")[1]
+
+def extract_trace_id_from_node(node):
+    return node.split(":")[0]
 
 
 class ActionTree:
@@ -46,6 +33,19 @@ class ActionTree:
     @property
     def is_attack(self):
         return self.tx.is_attack
+
+    @staticmethod
+    def get_ancestors_from_tree(tree, entry):
+        ancestors = set()
+        while entry != None:
+            parent_edges = list(tree.in_edges(entry))
+            if len(parent_edges) == 0:
+                entry = None
+            else:
+                entry = parent_edges[0][0]
+                node = extract_address_from_node(entry)
+                ancestors.add(node)
+        return ancestors
 
     @staticmethod
     def build_action_tree(tx_hash, traces, subtraces):

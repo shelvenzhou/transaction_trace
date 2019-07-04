@@ -17,6 +17,8 @@ class Transaction:
         self.is_attack = False
         self.attack_details = list()
 
+        self.destruct_contracts = list()
+
     def __repr__(self):
         return "meta-data of transaction %s" % self.tx_hash
 
@@ -32,6 +34,7 @@ class Transaction:
     @staticmethod
     def from_dict(d):
         tx = Transaction(d['tx_hash'], None, None, str_to_time(d['block_timestamp']), None, d['caller'])
-        tx.is_attack = True
-        tx.attack_details = d['attack_details']
+        if len(d['attack_details']) > 0:
+            tx.is_attack = True
+            tx.attack_details = d['attack_details']
         return tx

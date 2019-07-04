@@ -7,7 +7,7 @@ import pickle
 import transaction_trace
 from transaction_trace.analysis.intermediate_representations import Transaction
 from transaction_trace.analysis import TransactionCentricAnalysis, ContractCentricAnalysis, PreProcess
-from transaction_trace.analysis.checkers import CallInjectionChecker, AirdropHuntingChecker, IntegerOverflowChecker, ReentrancyChecker, ProfitChecker
+from transaction_trace.analysis.checkers import *
 
 l = logging.getLogger('driver')
 
@@ -26,6 +26,7 @@ def main(db_folder, log_path, input_log_file=None):
             tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
             tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
             tca.register_transaction_centric_checker(ReentrancyChecker(5))
+            tca.register_transaction_centric_checker(DestructContractChecker())
 
             for call_tree, result_graph in p.preprocess(txs):
                 if call_tree == None:
@@ -42,11 +43,11 @@ def main(db_folder, log_path, input_log_file=None):
                     d = eval(line.strip('\n'))
                     candidates.append(Transaction.from_dict(d))
 
-        cca = ContractCentricAnalysis(log_file)
-        cca.register_contract_centric_checker(ProfitChecker(db_folder))
+        cca = ContractCentricAnalysis(db_folder, log_file)
+        cca.register_contract_centric_checker(ProfitChecker())
+        cca.register_contract_centric_checker(CallAfterDestructChecker(log_file))
 
-        for tx in candidates:
-            cca.do_analysis(tx)
+        cca.do_analysis(candidates)
 
 
 
