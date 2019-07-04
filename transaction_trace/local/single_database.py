@@ -309,3 +309,40 @@ class SingleContractDatabase(Database):
             placeholders="?, ?, ?, ?, ?, ?, ?, ?",
             rows=rows
         )
+
+class SingleLogDatabase(Database):
+    def __init__(self, db_filepath, date):
+        super(SingleLogDatabase, self).__init__(db_filepath, date)
+
+    def create_logs_table(self):
+        self.create_table(
+            table_name='logs',
+            columns='''
+                log_index INT NOT NULL,
+                transaction_hash TEXT NOT NULL,
+                transaction_index INT NOT NULL,
+                address TEXT,
+                data TEXT,
+                topics TEXT,
+                block_timestamp TIMESTAMP NOT NULL,
+                block_number INT NOT NULL,
+                block_hash TEXT NOT NULL,
+                PRIMARY KEY(block_hash, log_index)
+            '''
+        )
+
+    def insert_log(self, row):
+        self.insert(
+            table="logs",
+            columns="",
+            placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?",
+            row=row
+        )
+
+    def insert_logs(self, rows):
+        self.batch_insert(
+            table="logs",
+            columns="",
+            placeholders="?, ?, ?, ?, ?, ?, ?, ?, ?",
+            row=rows
+        )

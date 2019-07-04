@@ -40,6 +40,11 @@ database_map = {
         "class_name": "SingleContractDatabase",
         "create": "create_contracts_table",
         "insert": "insert_contract"
+    },
+    "logs": {
+        "class_name": "SingleLogDatabase",
+        "create": "create_logs_table",
+        "insert": "insert_log"
     }
 }
 
