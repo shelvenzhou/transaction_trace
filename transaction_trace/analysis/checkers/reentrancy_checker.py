@@ -1,5 +1,5 @@
 from .checker import Checker, CheckerType
-from ..intermediate_representations import ActionTree, get_edges_from_cycle, extract_address_from_node, ResultGraph, ResultType
+from ..intermediate_representations import *
 
 import networkx as nx
 from collections import defaultdict
@@ -65,8 +65,8 @@ class ReentrancyChecker(Checker):
                 g[from_address][to_address]["call_traces"] = list()
 
             g[from_address][to_address]["call_traces"].append({
-                "trace_id": ActionTree.extract_trace_id_from_node(e[1]),
-                "parent_trace_id": ActionTree.extract_trace_id_from_node(e[0]),
+                "trace_id": extract_trace_id_from_node(e[1]),
+                "parent_trace_id": extract_trace_id_from_node(e[0]),
                 "height": len(trace["trace_address"]) if trace["trace_address"] != None else 0,
             })
 

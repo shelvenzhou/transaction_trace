@@ -105,14 +105,14 @@ class CallInjectionChecker(Checker):
                     continue
                 profit = dict()
                 for result_type in rg.g.nodes[node]:
-                    rt = ResultGraph.extract_result_type(result)
+                    rt = ResultGraph.extract_result_type(result_type)
                     if rt == ResultType.OWNER_CHANGE:
                         profit[result_type] = None
                     elif rt == ResultType.ETHER_TRANSFER:
                         if rg.g.nodes[node][result_type] > self.minimum_profit_amount[rt]:
                             profit[result_type] = rg.g.nodes[node][result_type]
                     elif rt == ResultType.TOKEN_TRANSFER_EVENT:
-                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[rt]:
+                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
                             profit[result_type] = rg.g.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
