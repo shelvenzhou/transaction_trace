@@ -5,11 +5,13 @@ import sqlite3
 import pickle
 from web3 import Web3
 from hashlib import sha256
+import logging
 
 from .local import EthereumDatabase
 from .datetime_utils import time_to_str, month_to_str
 from .analysis.intermediate_representations import ResultType
 
+l = logging.getLogger('eval_util')
 
 define_map = {
     'vandal': {
@@ -47,13 +49,21 @@ integer_flow_sensitive_function = {
     'multiTransfer(address[],uint256[])'
 }
 
+CAD_LOG_FILE = '/home/xiangjie/logs/suicide-contract-analyzer-20190625223619.log'
+CI_LOG_FILE = '/home/xiangjie/logs/call-injection-analyzer-20190607031718.log'
+HONEYPOT_LOG_FILE = '/home/xiangjie/logs/naive-honeypot.log'
+PAPERS_RESULT_FILE = '/home/xiangjie/logs/pickles/papers_result'
+
+REENTRANCY_ADDRS_MAP = '/home/xiangjie/logs/pickles/reen_addrs2target'
+
 
 class EvalUtil:
-    def __init__(self, log_file, cad_log_file, papers_result_file, ci_log_file=None):
+    def __init__(self, log_file, with_cad_log_file=True, with_ci_log_file=True):
+        self.papers_result_file = PAPERS_RESULT_FILE
         self.log_file = log_file
-        self.cad_log_file = cad_log_file
-        self.papers_result_file = papers_result_file
-        self.ci_log_file = ci_log_file
+        self.honeypot_log_file = HONEYPOT_LOG_FILE
+        self.cad_log_file = CAD_LOG_FILE if with_cad_log_file else None
+        self.ci_log_file = CI_LOG_FILE if with_ci_log_file else None
 
         self.papers_result = None
         self.txs = None
@@ -62,6 +72,8 @@ class EvalUtil:
 
         self.honeypot = None
         self.old_overflow = None
+
+        self.reen_addrs2target = None
 
         self.open_sourced_contract = None
         self.create_time = None
@@ -80,20 +92,10 @@ class EvalUtil:
 
         self.vul2contrs_open_sourced = None
 
-    def tmp_process_honeypot_log(self, honeypot_log_file):
-        f = open(honeypot_log_file, 'r')
-        lines = f.readlines()
-        rows = []
-        for line in lines:
-            if 'Closed profited' in line:
-                time = line.split('[')[1].split(']')[0]
-                contr = line.split(' ')[-1].strip('\n')
-                rows.append((time, contr))
+        self.load_data()
 
-        self.honeypot = rows
-        return rows
-
-    def process_data(self):
+    def load_data(self):
+        l.info("loading log file")
         f = open(self.log_file, 'r')
         lines = f.readlines()
         rows = []
@@ -104,17 +106,31 @@ class EvalUtil:
             txs[row['tx_hash']] = row
         self.txs = txs
 
-        f = open(self.cad_log_file, 'r')
+        l.info("loading honeypot log file")
+        f = open(self.honeypot_log_file, 'r')
         lines = f.readlines()
         rows = []
         for line in lines:
-            rows.append(eval(line.strip('\n')))
-        cad_txs = dict()
-        for row in rows:
-            cad_txs[row['tx_hash']] = row
-        self.cad_txs = cad_txs
+            if 'Closed profited' in line:
+                time = line.split('[')[1].split(']')[0]
+                contr = line.split(' ')[-1].strip('\n')
+                rows.append((time, contr))
+        self.honeypot = rows
+
+        if self.cad_log_file != None:
+            l.info("loading cad log file")
+            f = open(self.cad_log_file, 'r')
+            lines = f.readlines()
+            rows = []
+            for line in lines:
+                rows.append(eval(line.strip('\n')))
+            cad_txs = dict()
+            for row in rows:
+                cad_txs[row['tx_hash']] = row
+            self.cad_txs = cad_txs
 
         if self.ci_log_file != None:
+            l.info("load call-injection log file")
             f = open(self.ci_log_file, 'r')
             lines = f.readlines()
             rows = []
@@ -125,9 +141,15 @@ class EvalUtil:
                 ci_txs[row['tx_hash']] = row
             self.ci_txs = ci_txs
 
+        l.info("loading reen_addrs2target_map")
+        with open(REENTRANCY_ADDRS_MAP, 'rb') as f:
+            self.reen_addrs2target = pickle.load(f)
+
+        l.info("loading related paper results")
         with open(self.papers_result_file, 'rb') as f:
             self.papers_result = pickle.load(f)
 
+        l.info("loading contract source code")
         open_sourced_contract = dict()
         etherscan_db = sqlite3.connect(
             '/home/xiangjie/database/etherscan.sqlite3')
@@ -136,6 +158,7 @@ class EvalUtil:
                 open_sourced_contract[row[0]] = row[1]
         self.open_sourced_contract = open_sourced_contract
 
+        l.info("loading contract create time and bytecode")
         create_time = dict()
         bytecode = dict()
         contracts_db = EthereumDatabase(
@@ -160,25 +183,31 @@ class EvalUtil:
             if month not in month2txs:
                 month2txs[month] = defaultdict(set)
             for checker in self.txs[tx_hash]['attack_details']:
-                if checker['checker'] == 'integer-overflow':
-                    for attack in checker['attacks']:
-                        if attack['func_name'] in integer_flow_sensitive_function:
-                            day2txs[day][checker['checker']].add(tx_hash)
-                            month2txs[month][checker['checker']].add(tx_hash)
-                            break
-                else:
-                    day2txs[day][checker['checker']].add(tx_hash)
-                    month2txs[month][checker['checker']].add(tx_hash)
-
-        for tx_hash in self.cad_txs:
-            day = self.cad_txs[tx_hash]['time'][:10]
-            if day not in day2txs:
-                day2txs[day] = defaultdict(set)
-            month = self.cad_txs[tx_hash]['time'][:7]
-            if month not in month2txs:
-                month2txs[month] = defaultdict(set)
-            day2txs[day]['call-after-destruct'].add(tx_hash)
-            month2txs[month]['call-after-destruct'].add(tx_hash)
+                # if checker['checker'] == 'integer-overflow':
+                #     for attack in checker['attacks']:
+                #         if attack['func_name'] in integer_flow_sensitive_function:
+                #             day2txs[day][checker['checker']].add(tx_hash)
+                #             month2txs[month][checker['checker']].add(tx_hash)
+                #             break
+                # else:
+                #     day2txs[day][checker['checker']].add(tx_hash)
+                #     month2txs[month][checker['checker']].add(tx_hash)
+                day2txs[day][checker['checker']].add(tx_hash)
+                month2txs[month][checker['checker']].add(tx_hash)
+        if self.cad_txs != None:
+            for d in day2txs:
+                day2txs[d]['call-after-destruct'].clear()
+            for m in month2txs:
+                month2txs[m]['call-after-destruct'].clear()
+            for tx_hash in self.cad_txs:
+                day = self.cad_txs[tx_hash]['time'][:10]
+                if day not in day2txs:
+                    day2txs[day] = defaultdict(set)
+                month = self.cad_txs[tx_hash]['time'][:7]
+                if month not in month2txs:
+                    month2txs[month] = defaultdict(set)
+                day2txs[day]['call-after-destruct'].add(tx_hash)
+                month2txs[month]['call-after-destruct'].add(tx_hash)
 
         if self.ci_txs != None:
             for d in day2txs:
@@ -196,14 +225,12 @@ class EvalUtil:
                 month2txs[m]['call-injection'].add(tx_hash)
 
         self.day2txs, self.month2txs = day2txs, month2txs
-        return {'day2txs': day2txs, 'month2txs': month2txs}
 
-
-
-    def get_vul2txs_and_vul2conts(self):
+    def get_vuls_info(self):
         vul2txs = defaultdict(set)
         vul2contrs = defaultdict(set)
         contr2txs = defaultdict(dict)
+        vul2contrs_open_sourced = defaultdict(set)
 
         for tx_hash in self.txs:
             for checker in self.txs[tx_hash]['attack_details']:
@@ -211,12 +238,14 @@ class EvalUtil:
                 vul2txs[name].add(tx_hash)
                 if name == 'integer-overflow':
                     for attack in checker['attacks']:
-                        if attack['func_name'] not in integer_flow_sensitive_function:
-                            continue
+                        # if attack['func_name'] not in integer_flow_sensitive_function:
+                        #     continue
                         vul2txs[name].add(tx_hash)
                         node = attack['edge'][1]
                         address = node.split(":")[1]
                         vul2contrs[name].add(address)
+                        if address in self.open_sourced_contract:
+                            vul2contrs_open_sourced[name].add(address)
                         if address not in contr2txs[name]:
                             contr2txs[name][address] = set()
                         contr2txs[name][address].add(tx_hash)
@@ -226,6 +255,8 @@ class EvalUtil:
                         node = attack['edge'][1]
                         address = node.split(":")[1]
                         vul2contrs[name].add(address)
+                        if address in self.open_sourced_contract:
+                            vul2contrs_open_sourced[name].add(address)
                         if address not in contr2txs[name]:
                             contr2txs[name][address] = set()
                         contr2txs[name][address].add(tx_hash)
@@ -235,10 +266,13 @@ class EvalUtil:
                         cycle = attack['cycle']
                         cycle.sort()
                         addrs = tuple(cycle)
-                        vul2contrs[name].add(addrs)
+                        address = self.reen_addrs2target[addrs]
+                        vul2contrs[name].add(address)
+                        if address in self.open_sourced_contract:
+                            vul2contrs_open_sourced[name].add(address)
                         if addrs not in contr2txs[name]:
-                            contr2txs[name][addrs] = set()
-                        contr2txs[name][addrs].add(tx_hash)
+                            contr2txs[name][address] = set()
+                        contr2txs[name][address].add(tx_hash)
                 elif name == 'airdrop-hunting':
                     vul2txs[name].add(tx_hash)
                     token_address = ''
@@ -251,14 +285,32 @@ class EvalUtil:
                                 token_address = token
                                 m_amount = amount
                     vul2contrs[name].add(token_address)
+                    if token_address in self.open_sourced_contract:
+                        vul2contrs_open_sourced[name].add(token_address)
                     if token_address not in contr2txs[name]:
                         contr2txs[name][token_address] = set()
                     contr2txs[name][token_address].add(tx_hash)
 
-        for tx_hash in self.cad_txs:
-            vul2txs['call-after-destruct'].add(tx_hash)
-            for d in self.cad_txs[tx_hash]['detail']:
-                vul2contrs['call-after-destruct'].add(d['contract'])
+        for row in self.honeypot:
+            self.vul2contrs['honeypot'].add(row[1])
+        for c in self.vul2contrs['honeypot']:
+            if c in self.open_sourced_contract:
+                self.vul2contrs_open_sourced['honeypot'].add(c)
+
+        if self.cad_txs != None:
+            vul2txs['call-after-destruct'].clear()
+            vul2contrs['call-after-destruct'].clear()
+            vul2contrs_open_sourced['call-after-destruct'].clear()
+            contr2txs['call-after-destruct'].clear()
+            for tx_hash in self.cad_txs:
+                vul2txs['call-after-destruct'].add(tx_hash)
+                for d in self.cad_txs[tx_hash]['detail']:
+                    vul2contrs['call-after-destruct'].add(d['contract'])
+                    if d['contract'] in self.open_sourced_contract:
+                        vul2contrs_open_sourced['call-after-destruct'].add(d['contract'])
+                    if d['contract'] not in contr2txs['call-after-destruct']:
+                        contr2txs['call-after-destruct'] = set()
+                    contr2txs['call-after-destruct'][d['contract']].add(tx_hash)
 
         if self.ci_txs != None:
             vul2txs['call-injection'].clear()
@@ -271,28 +323,27 @@ class EvalUtil:
                     contr2txs['call-injection'][self.ci_txs[tx_hash]['entry']] = set()
                 contr2txs['call-injection'][self.ci_txs[tx_hash]['entry']].add(tx_hash)
 
-        self.vul2txs, self.vul2contrs, self.contr2txs = vul2txs, vul2contrs, contr2txs
-        return {'vul2txs': vul2txs, 'vul2contrs': vul2contrs, 'contr2txs': contr2txs}
+        self.vul2txs, self.vul2contrs, self.vul2contrs_open_sourced, self.contr2txs = vul2txs, vul2contrs, vul2contrs_open_sourced, contr2txs
 
-    def get_vul2contrs_open_sourced(self, vul2contrs):
-        vul2contrs_open_sourced = defaultdict(set)
-        for v in vul2contrs:
-            if v == 'reentrancy':
-                open_sourced_contrs = list()
-                for addrs in vul2contrs[v]:
-                    open_sourced_contrs = list()
-                    for c in addrs:
-                        if c in self.open_sourced_contract:
-                            open_sourced_contrs.append(c)
-                    if len(open_sourced_contrs) > 0:
-                        vul2contrs_open_sourced[v].add(
-                            tuple(open_sourced_contrs))
-            for c in vul2contrs[v]:
-                if c in self.open_sourced_contract:
-                    vul2contrs_open_sourced[v].add(c)
-
-        self.vul2contrs_open_sourced = vul2contrs_open_sourced
-        return vul2contrs_open_sourced
+    def replace_overflow_wt_old(self, overflow_pickle_file):
+        with open(overflow_pickle_file, 'rb') as f:
+            flow = pickle.load(f)
+        self.old_overflow = flow
+        contrs = set()
+        contrs_open_sourced = set()
+        txs = set()
+        contr2txs = defaultdict(set)
+        for c in flow:
+            contrs.add(c)
+            if c in self.open_sourced_contract:
+                contrs_open_sourced.add(c)
+            for row in flow[c]:
+                txs.add(row[0])
+                contr2txs[c].add(row[0])
+        self.vul2contrs['integer-overflow'] = contrs
+        self.vul2contrs_open_sourced['integer-overflow'] = contrs_open_sourced = set()
+        self.vul2txs['integer-overflow'] = txs
+        self.contr2txs['integer-overflow'] = contr2txs
 
     def papers_cmp_ours_wt_vul(self, vul2contrs):
         paper_inter_ours = dict()
@@ -342,63 +393,6 @@ class EvalUtil:
 
         return {'paper_candidates': paper_candidates, 'our_candidates': our_candidates, 'reported': reported, 'not_reported': not_reported, 'resid_ours': resid_ours}
 
-    def fix_reen_contrs(self, addrs2contr):
-        fixed_vul2contrs = defaultdict(set)
-        fixed_vul2contrs_open_sourced = defaultdict(set)
-        reen_contr2txs = defaultdict(set)
-
-        for v in self.vul2contrs:
-            if v == 'reentrancy':
-                for addrs in self.vul2contrs[v]:
-                    if addrs not in addrs2contr:
-                        continue
-                    contr = addrs2contr[addrs]
-                    fixed_vul2contrs[v].add(contr)
-                    if contr in self.open_sourced_contract:
-                        fixed_vul2contrs_open_sourced[v].add(contr)
-            else:
-                fixed_vul2contrs[v] = self.vul2contrs[v]
-                fixed_vul2contrs_open_sourced[v] = self.vul2contrs_open_sourced[v]
-
-        for v in self.contr2txs:
-            if v == 'reentrancy':
-                for addrs in self.contr2txs[v]:
-                    if addrs not in addrs2contr:
-                        continue
-                    contr = addrs2contr[addrs]
-                    for c in self.contr2txs[v][addrs]:
-                        reen_contr2txs[contr].add(c)
-
-        self.vul2contrs, self.vul2contrs_open_sourced, self.contr2txs['reentrancy'] = fixed_vul2contrs, fixed_vul2contrs_open_sourced, reen_contr2txs
-
-    def fix_honeypot_contrs(self, rows):
-        for row in rows:
-            self.vul2contrs['honeypot'].add(row[1])
-
-        for c in self.vul2contrs['honeypot']:
-            if c in self.open_sourced_contract:
-                self.vul2contrs_open_sourced['honeypot'].add(c)
-
-    def replace_overflow_wt_old(self, overflow_pickle_file):
-        with open(overflow_pickle_file, 'rb') as f:
-            flow = pickle.load(f)
-        self.old_overflow = flow
-        contrs = set()
-        contrs_open_sourced = set()
-        txs = set()
-        contr2txs = defaultdict(set)
-        for c in flow:
-            contrs.add(c)
-            if c in self.open_sourced_contract:
-                contrs_open_sourced.add(c)
-            for row in flow[c]:
-                txs.add(row[0])
-                contr2txs[c].add(row[0])
-        self.vul2contrs['integer-overflow'] = contrs
-        self.vul2contrs_open_sourced['integer-overflow'] = contrs_open_sourced = set()
-        self.vul2txs['integer-overflow'] = txs
-        self.contr2txs['integer-overflow'] = contr2txs
-
     def get_contr_popularity(self, paper_candidates, our_candidates):
         reported_contr_popularity = dict()
         attacked_contr_popularity = dict()
@@ -446,20 +440,6 @@ class EvalUtil:
                         attacked_contr_popularity[c][ty][m])
 
         return {'reported_contr_popularity': reported_contr_popularity, 'attacked_contr_popularity': attacked_contr_popularity}
-
-    def get_code2txs(self, fixed_vul2contrs):
-        code2txs = dict()
-        for v in self.contr2txs:
-            code2txs[v] = defaultdict(set)
-            for c in fixed_vul2contrs[v]:
-                if c not in self.open_sourced_contract:
-                    continue
-                code = self.open_sourced_contract[c]
-                h = sha256(code.encode('utf-8')).hexdigest()
-                for tx_hash in self.contr2txs[v][c]:
-                    code2txs[v][h].add(tx_hash)
-        self.code2txs = code2txs
-        return code2txs
 
     def dat_contr_month_popularity(self, paper_candidates, reported_contr_popularity, attacked_contr_popularity):
         begin = datetime(2015, 8, 1, 0, 0)
@@ -559,6 +539,20 @@ class EvalUtil:
                         contr_cdf_dat[i][v] = '?'
         return contr_cdf_dat
 
+    def get_code2txs(self, fixed_vul2contrs):
+        code2txs = dict()
+        for v in self.contr2txs:
+            code2txs[v] = defaultdict(set)
+            for c in fixed_vul2contrs[v]:
+                if c not in self.open_sourced_contract:
+                    continue
+                code = self.open_sourced_contract[c]
+                h = sha256(code.encode('utf-8')).hexdigest()
+                for tx_hash in self.contr2txs[v][c]:
+                    code2txs[v][h].add(tx_hash)
+        self.code2txs = code2txs
+        return code2txs
+
     def dat_code_cdf(self):
         code_cdf_dat = defaultdict(dict)
         for i in range(1, 101):
@@ -602,7 +596,6 @@ class EvalUtil:
         self.bytecode2txs = bytecode2txs
         return bytecode2txs
 
-
     def dat_bytecode_cdf(self):
         bytecode_cdf_dat = defaultdict(dict)
         for i in range(1, 101):
@@ -633,7 +626,7 @@ class EvalUtil:
         return bytecode_cdf_dat
 
     @staticmethod
-    def get_contract_attrs(eu, reen_addrs2tartget, flow):
+    def get_contract_attrs(eu):
         contract_attrs = dict()
         for tx_hash in eu.txs:
             for checker in eu.txs[tx_hash]['attack_details']:
@@ -664,8 +657,8 @@ class EvalUtil:
                         cycle = attack['cycle']
                         cycle.sort()
                         addrs = tuple(cycle)
-                        if addrs in reen_addrs2tartget:
-                            addr = reen_addrs2tartget[addrs]
+                        if addrs in self.reen_addrs2target:
+                            addr = self.reen_addrs2target[addrs]
                             if addr not in contract_attrs:
                                 contract_attrs[addr] = {'create_time': time_to_str(eu.create_time[addr]), 'attacked_time': set(), 'vul_type': set()}
                             contract_attrs[addr]['attacked_time'].add(time)
