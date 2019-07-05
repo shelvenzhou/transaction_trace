@@ -81,7 +81,7 @@ class TraceUtil:
         return paths
 
     @staticmethod
-    def hash_subtraces(self, subtraces):
+    def hash_subtraces(subtraces):
         address_map = {}
         symbolic_subtraces = []
         for subtrace in subtraces:
@@ -95,7 +95,7 @@ class TraceUtil:
                     symbolic_subtrace.append(symbol)
             symbolic_subtrace.append(subtrace[2])
             symbolic_subtraces.append(symbolic_subtrace)
-        m = hashlib.sha256(str(symbolic_subtraces).encode('utf-8'))
+        m = sha256(str(symbolic_subtraces).encode('utf-8'))
         return '0x' + m.hexdigest()
 
     @staticmethod
