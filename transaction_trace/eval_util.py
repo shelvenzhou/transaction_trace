@@ -266,6 +266,8 @@ class EvalUtil:
                         cycle = attack['cycle']
                         cycle.sort()
                         addrs = tuple(cycle)
+                        if addrs not in self.reen_addrs2target:
+                            continue
                         address = self.reen_addrs2target[addrs]
                         vul2contrs[name].add(address)
                         if address in self.open_sourced_contract:
@@ -657,12 +659,13 @@ class EvalUtil:
                         cycle = attack['cycle']
                         cycle.sort()
                         addrs = tuple(cycle)
-                        if addrs in self.reen_addrs2target:
-                            addr = self.reen_addrs2target[addrs]
-                            if addr not in contract_attrs:
-                                contract_attrs[addr] = {'create_time': time_to_str(eu.create_time[addr]), 'attacked_time': set(), 'vul_type': set()}
-                            contract_attrs[addr]['attacked_time'].add(time)
-                            contract_attrs[addr]['vul_type'].add(name)
+                        if addrs not in self.reen_addrs2target:
+                            continue
+                        addr = self.reen_addrs2target[addrs]
+                        if addr not in contract_attrs:
+                            contract_attrs[addr] = {'create_time': time_to_str(eu.create_time[addr]), 'attacked_time': set(), 'vul_type': set()}
+                        contract_attrs[addr]['attacked_time'].add(time)
+                        contract_attrs[addr]['vul_type'].add(name)
                 elif name == 'airdrop-hunting':
                     token_address = ''
                     m_amount = 0
