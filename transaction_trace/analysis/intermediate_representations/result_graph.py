@@ -78,8 +78,9 @@ class ResultGraph:
                 for result_type, src, dst, amount in SensitiveAPIs.get_result_details(trace):
                     if result_type is None:
                         continue
-                    else:
-                        tree.edges[e][result_type] = (src, dst, amount)
+                    if result_type not in tree.edges[e]:
+                        tree.edges[e][result_type] = list()
+                    tree.edges[e][result_type].append((src, dst, amount))
 
         return tree
 
@@ -106,15 +107,14 @@ class ResultGraph:
 
                 elif result_type == ResultType.TOKEN_TRANSFER:
                     token_address = extract_address_from_node(e[1])
+                    for (src, dst, amount) in result_tree.edges[e][result_type]:
+                        if src == dst:
+                            continue
+                        graph.add_edge(src, dst)
 
-                    (src, dst, amount) = result_tree.edges[e][result_type]
-                    if src == dst:
-                        continue
-                    graph.add_edge(src, dst)
-
-                    token_result_type = f"{result_type}:{token_address}"
-                    ResultGraph.append_result_to_graph(
-                        src, dst, amount, token_result_type, graph)
+                        token_result_type = f"{result_type}:{token_address}"
+                        ResultGraph.append_result_to_graph(
+                            src, dst, amount, token_result_type, graph)
 
                 else:  # ResultType.OWNER_CHANGE
                     (src, dst, _) = result_tree.edges[e][result_type]
@@ -141,6 +141,6 @@ class ResultGraph:
             for row in token_transfers:
                 token_result_type = f"{ResultType.TOKEN_TRANSFER_EVENT}:{row['token_address']}"
                 ResultGraph.append_result_to_graph(
-                    row['from_address'], row['to_address'], row['value'], token_result_type, graph)
+                    row['from_address'], row['to_address'], int(row['value']), token_result_type, graph)
 
         return ResultGraph(action_tree.tx, result_tree, graph)

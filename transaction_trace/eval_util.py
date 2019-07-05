@@ -294,10 +294,10 @@ class EvalUtil:
                     contr2txs[name][token_address].add(tx_hash)
 
         for row in self.honeypot:
-            self.vul2contrs['honeypot'].add(row[1])
-        for c in self.vul2contrs['honeypot']:
+            vul2contrs['honeypot'].add(row[1])
+        for c in vul2contrs['honeypot']:
             if c in self.open_sourced_contract:
-                self.vul2contrs_open_sourced['honeypot'].add(c)
+                vul2contrs_open_sourced['honeypot'].add(c)
 
         if self.cad_txs != None:
             vul2txs['call-after-destruct'].clear()
@@ -311,7 +311,7 @@ class EvalUtil:
                     if d['contract'] in self.open_sourced_contract:
                         vul2contrs_open_sourced['call-after-destruct'].add(d['contract'])
                     if d['contract'] not in contr2txs['call-after-destruct']:
-                        contr2txs['call-after-destruct'] = set()
+                        contr2txs['call-after-destruct'][d['contract']] = set()
                     contr2txs['call-after-destruct'][d['contract']].add(tx_hash)
 
         if self.ci_txs != None:

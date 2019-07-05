@@ -14,7 +14,8 @@ def patched_zip(dst, amount):
         for _dst in dst:
             yield _dst, amount
     else:
-        return zip(dst, amount)
+        for _dst, _amount in zip(dst, amount):
+            yield _dst, _amount
 
 def extract_function_signature(input_data):
     if input_data is None:
