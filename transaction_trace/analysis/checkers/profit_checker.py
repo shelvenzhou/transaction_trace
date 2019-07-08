@@ -93,10 +93,12 @@ class ProfitChecker(Checker):
                         src = token_transfer['from_address']
                         dst = token_transfer['to_address']
                         amount = token_address['value']
-                        if src == contract and dst == account:
-                            income -= amount
-                        elif dst == contract and src == account:
-                            income += amount
+                        if src == contract:
+                            if account == None or account == dst:
+                                income -= amount
+                        elif dst == contract:
+                            if account == None or account == src:
+                                income += amount
 
         if account not in self.income_cache[contract]:
             self.income_cache[contract][account] = defaultdict(dict)
@@ -162,9 +164,10 @@ class ProfitChecker(Checker):
                 net_profits = dict()
                 for result_type in candidates[checker][profit_node]:
                     outlay = 0
+                    profit_account = None if checker == 'integer-overflow' else profit_node
                     for victim in candidates[checker][profit_node][result_type]['victims']:
                         outlay += self.check_contract_income_forward(
-                            victim, profit_node, time_to_str(tx.block_timestamp), result_type)
+                            victim, profit_account, time_to_str(tx.block_timestamp), result_type)
 
                     net_profit = candidates[checker][profit_node][result_type]['amount'] - outlay
                     if net_profit > 0:
