@@ -117,11 +117,10 @@ class ResultGraph:
                             src, dst, amount, token_result_type, graph)
 
                 else:  # ResultType.OWNER_CHANGE
-                    (src, dst, _) = result_tree.edges[e][result_type]
-
-                    graph.add_edge(src, dst)
-                    graph[src][dst][result_type] = None
-                    graph.nodes[dst][result_type] = None
+                    for (src, dst, amount) in result_tree.edges[e][result_type]:
+                        graph.add_edge(src, dst)
+                        graph[src][dst][result_type] = None
+                        graph.nodes[dst][result_type] = None
 
         return graph
 
