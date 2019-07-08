@@ -92,7 +92,8 @@ class SensitiveAPIs:
         'transferMulti(address[],uint256[])',
         'transferProxy(address,address,uint256,uint256,uint8,bytes32,bytes32)',
         'batchTransfer(address[],uint256)',
-        'multiTransfer(address[],uint256[])'
+        'batchTransfers(address[],uint256[])',
+        'multiTransfer(address[],uint256[])',
     }
 
     _sensitive_functions = {
@@ -115,6 +116,7 @@ class SensitiveAPIs:
             '0x35bce6e4': 'transferMulti(address[],uint256[])',
             '0xeb502d45': 'transferProxy(address,address,uint256,uint256,uint8,bytes32,bytes32)',
             '0x83f12fec': 'batchTransfer(address[],uint256)',
+            '0x3badca25': 'batchTransfers(address[],uint256[])',
             '0x1e89d545': 'multiTransfer(address[],uint256[])'
         }
     }
@@ -140,6 +142,7 @@ class SensitiveAPIs:
         '0x35bce6e4': (0, 1),
         '0xeb502d45': (0, 1, 2),
         '0x83f12fec': (0, 1),
+        '0x3badca25': (0, 1),
         '0x1e89d545': (0, 1)
     }
 

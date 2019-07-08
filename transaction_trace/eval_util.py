@@ -659,9 +659,9 @@ class EvalUtil:
                         cycle = attack['cycle']
                         cycle.sort()
                         addrs = tuple(cycle)
-                        if addrs not in self.reen_addrs2target:
+                        if addrs not in eu.reen_addrs2target:
                             continue
-                        addr = self.reen_addrs2target[addrs]
+                        addr = eu.reen_addrs2target[addrs]
                         if addr not in contract_attrs:
                             contract_attrs[addr] = {'create_time': time_to_str(eu.create_time[addr]), 'attacked_time': set(), 'vul_type': set()}
                         contract_attrs[addr]['attacked_time'].add(time)
@@ -703,12 +703,12 @@ class EvalUtil:
                         contract_attrs[c] = {'create_time': time_to_str(eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
                     contract_attrs[c]['vul_type'].add(mv)
 
-        for c in flow:
+        for c in eu.old_overflow:
             if c not in eu.create_time:
                 continue
             if c not in contract_attrs:
                 contract_attrs[c] = {'create_time': time_to_str(eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
-            for row in flow[c]:
+            for row in eu.old_overflow[c]:
                 contract_attrs[c]['attacked_time'].add(row[1])
 
         for row in eu.honeypot:

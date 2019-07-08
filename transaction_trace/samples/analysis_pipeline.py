@@ -19,17 +19,17 @@ def main(db_folder, log_path, input_log_file=None):
         candidates = list()
         if input_log_file == None:
             tca = TransactionCentricAnalysis(log_file)
-            tca.register_transaction_centric_checker(CallInjectionChecker())
-            tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
+            # tca.register_transaction_centric_checker(CallInjectionChecker())
+            # tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
             tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
-            tca.register_transaction_centric_checker(ReentrancyChecker(5))
+            # tca.register_transaction_centric_checker(ReentrancyChecker(5))
             tca.register_transaction_centric_checker(DestructContractChecker())
 
             for call_tree, result_graph in p.preprocess():
                 if call_tree == None:
                     continue
                 tca.do_analysis(call_tree, result_graph)
-                if call_tree.tx.is_attack == True:
+                if call_tree.tx.is_attack == True or len(call_tree.tx.destruct_contracts) > 0:
                     candidates.append(call_tree.tx)
         else:
             with open(os.path.join(log_path, input_log_file)) as input_log:
