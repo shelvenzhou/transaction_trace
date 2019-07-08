@@ -31,8 +31,8 @@ async def main(db_filepath, api_key_filepath, addrs_filepath):
             if contract == None:
                 continue
             l.insert_contract([contract[x] for x in ContractCode.key_order])
+            l.commit()
             print(count, 'left')
-
     await r.client.close()
 
 
