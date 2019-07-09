@@ -13,26 +13,45 @@ async def main(db_filepath, api_key_filepath, addrs_filepath):
     with open(addrs_filepath, 'rb') as f:
         addrs = pickle.load(f)
 
-    l.create_contracts_table()
-    rows = l.read('contracts', 'ContractAddress, SourceCode')
+    bytecode_hash2contracts = addrs['bytecode_hash2contracts']
+    func_hash = list(bytecode_hash2contracts.keys())
+
     addrs_in_database = set()
+    l.create_contracts_table()
+    rows = l.read('contracts', '*')
     for row in rows:
         addrs_in_database.add(row[0])
 
-    count = len(addrs)
-    for addr in addrs:
-        count -= 1
-        if addr in addrs_in_database:
-            continue
-        if len(addr) != 42 or not addr.startswith('0x'):
-            print('not valid address')
-        else:
-            contract = await r.get_contract_info(addr)
-            if contract == None:
+
+    count = len(func_hash)
+    for h in func_hash:
+        for addr in bytecode_hash2contracts[h]:
+            if addr in addrs_in_database:
                 continue
-            l.insert_contract([contract[x] for x in ContractCode.key_order])
-            l.commit()
-            print(count, 'left')
+            if len(addr) != 42 or not addr.startswith('0x'):
+                print('not valid address')
+            else:
+                contract = await r.get_contract_info(addr)
+                if contract == None:
+                    continue
+                row = [contract[x] for x in ContractCode.key_order]
+                try:
+                    l.insert_contract(row)
+                    l.commit()
+                except:
+                    pass
+                if row[1] != '':
+                    for c in bytecode_hash2contracts[h]:
+                        try:
+                            row[0] = c
+                            l.insert_contract(row)
+                        except:
+                            pass
+                    l.commit()
+                    break
+        count -= 1
+        print(count, ' bytecode hash left')
+
     await r.client.close()
 
 
