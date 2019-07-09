@@ -49,6 +49,13 @@ integer_flow_sensitive_function = {
     'multiTransfer(address[],uint256[])'
 }
 
+multi_transfer_function = {
+    '0x35bce6e4': 'transferMulti(address[],uint256[])',
+    '0x83f12fec': 'batchTransfer(address[],uint256)',
+    '0x3badca25': 'batchTransfers(address[],uint256[])',
+    '0x1e89d545': 'multiTransfer(address[],uint256[])'
+}
+
 CAD_LOG_FILE = '/home/xiangjie/logs/suicide-contract-analyzer-20190625223619.log'
 CI_LOG_FILE = '/home/xiangjie/logs/call-injection-analyzer-20190607031718.log'
 HONEYPOT_LOG_FILE = '/home/xiangjie/logs/naive-honeypot.log'
