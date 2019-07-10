@@ -50,5 +50,6 @@ class PreProcess(TraceAnalysis):
                     graph = ResultGraph.build_result_graph(tree, token_transfers[tx_hash] if tx_hash in token_transfers else None)
 
                     yield tree, graph
-
-                yield None, None
+                else:
+                    l.debug("invalid action tree for %s", tx_hash)
+                    yield None, None
