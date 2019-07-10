@@ -10,11 +10,14 @@ def get_edges_from_cycle(cycle):
     edges.append((cycle[-1], cycle[0]))
     return edges
 
+
 def encode_node(trace_id, address):
     return str(trace_id) + ":" + address
 
+
 def extract_address_from_node(node):
     return node.split(":")[1]
+
 
 def extract_trace_id_from_node(node):
     return node.split(":")[0]
@@ -51,7 +54,7 @@ class ActionTree:
     def build_action_tree(tx_hash, traces, subtraces):
         tx = None
         tree = nx.DiGraph()
-        errs = dict()
+        errs = list()
         for trace_id, parent_trace_id in subtraces.items():
             trace = traces[trace_id]
 
@@ -78,7 +81,14 @@ class ActionTree:
                 to_node = encode_node(trace_id, trace['to_address'])
 
             if trace['status'] == 0:
-                errs[from_node] = trace['error']
+                errs.append({
+                    'from_address': trace['from_address'],
+                    'to_address': trace['to_address'],
+                    'trace_type': trace['trace_type'],
+                    'call_type': trace['call_type'],
+                    'input': trace['input'],
+                    'error': trace['error'],
+                })
 
             tree.add_edge(from_node, to_node, **dict(trace))
 
