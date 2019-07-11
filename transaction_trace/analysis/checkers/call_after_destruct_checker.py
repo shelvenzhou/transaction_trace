@@ -1,4 +1,4 @@
-from .checker import Checker
+from .checker import Checker, CheckerType
 from ...local import DatabaseName
 from ..knowledge import SensitiveAPIs
 from ...datetime_utils import time_to_str
@@ -16,6 +16,9 @@ class CallAfterDestructChecker(Checker):
         self.database = None
         self.log_file = log_file
 
+    @property
+    def checker_type(self):
+        return CheckerType.CONTRACT_CENTRIC
 
     def do_check(self, txs, db):
         if self.database == None:
@@ -35,7 +38,7 @@ class CallAfterDestructChecker(Checker):
     def check_destruct_contracts(self, destruct_contracts):
         for conn in self.database[DatabaseName.TRACE_DATABASE].get_all_connnections():
             traces = defaultdict(list)
-            for row in conn.read('traces', "transaction_hash, from_address, to_address, value, input, status, block_timestamp"):
+            for row in conn.read('traces', "*"):
                 if row['trace_type'] != 'call':
                     continue
                 tx_hash = row['transaction_hash']

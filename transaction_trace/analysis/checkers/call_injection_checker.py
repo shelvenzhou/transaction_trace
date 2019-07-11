@@ -117,7 +117,7 @@ class CallInjectionChecker(Checker):
                 if len(profit) > 0:
                     profits[node] = profit
 
-            if len(profit) > 0:
+            if len(profits) > 0:
                 tx.is_attack = True
                 tx.attack_details.append({
                     "checker": self.name,

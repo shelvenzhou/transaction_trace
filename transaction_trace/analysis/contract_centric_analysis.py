@@ -25,10 +25,18 @@ class ContractCentricAnalysis(TraceAnalysis):
         self.checkers[checker.name] = checker
 
     def do_analysis(self, txs):
-        for checker_name, checker in self.checkers.items():
-            checker.do_check(txs, self.database)
+        # for checker_name, checker in self.checkers.items():
+        #     checker.do_check(txs, self.database)
+
+        # for tx in txs:
+        #     if tx.is_attack:
+        #         l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
+        #             set([attack['checker'] for attack in tx.attack_details])))
+        #         self.record_abnormal_detail(tx.to_string())
 
         for tx in txs:
+            for _, checker in self.checkers.items():
+                checker.do_check([tx], self.database)
             if tx.is_attack:
                 l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
                     set([attack['checker'] for attack in tx.attack_details])))

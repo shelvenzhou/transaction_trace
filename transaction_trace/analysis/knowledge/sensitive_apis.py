@@ -89,6 +89,8 @@ def _extract_function_parameters(func_name, input_data):
 class SensitiveAPIs:
 
     _integer_overflow_sensitive_functions = {
+        'transfer(address,uint256)',
+        'transferFrom(address,address,uint256)',
         'transferMulti(address[],uint256[])',
         'transferProxy(address,address,uint256,uint256,uint8,bytes32,bytes32)',
         'batchTransfer(address[],uint256)',

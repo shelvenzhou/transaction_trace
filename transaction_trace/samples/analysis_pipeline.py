@@ -38,11 +38,11 @@ def main(db_folder, log_path, input_log_file=None):
                     d = eval(line.strip('\n'))
                     candidates.append(Transaction.from_dict(d))
 
-        # cca = ContractCentricAnalysis(db_folder, log_file)
-        # cca.register_contract_centric_checker(ProfitChecker())
+        cca = ContractCentricAnalysis(db_folder, log_file)
+        cca.register_contract_centric_checker(ProfitChecker())
         # cca.register_contract_centric_checker(CallAfterDestructChecker(log_file))
 
-        # cca.do_analysis(candidates)
+        cca.do_analysis(candidates)
 
 
 

@@ -10,7 +10,7 @@ l = logging.getLogger("transaction-trace.analysis.checkers.ProfitChecker")
 
 
 def check_time_interval(begin_time, end_time, date, time):
-    if begin_time < date < end_time:
+    if begin_time[:10] < date < end_time[:10]:
         return True
     elif date == begin_time[:10] and time > begin_time:
         return True
@@ -49,7 +49,8 @@ class ProfitChecker(Checker):
 
         txs = self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE].read_transactions_of_contract(
             contract)
-        l.info("%d transactions for %s", len(txs), contract)
+        l.info("%d dates for %s", len(txs), contract)
+        import IPython;IPython.embed()
         for date in txs:
             if date > timestamp[:10] or date < time[:10]:
                 continue
@@ -64,7 +65,9 @@ class ProfitChecker(Checker):
                     tx_hash = row['transaction_hash']
                     traces[tx_hash].append(row)
 
-                for tx_hash in traces:
+                for tx_hash in txs[date]:
+                    if tx_hash not in traces:
+                        import IPython;IPython.embed()
                     if not check_time_interval(time, timestamp, date, time_to_str(traces[tx_hash][0]['block_timestamp'])):
                         continue
                     for trace in traces[tx_hash]:
@@ -84,7 +87,9 @@ class ProfitChecker(Checker):
                     tx_hash = row['transaction_hash']
                     token_transfers[tx_hash].append(row)
 
-                for tx_hash in token_transfers:
+                for tx_hash in txs[date]:
+                    if tx_hash not in token_transfers:
+                        continue
                     if not check_time_interval(time, timestamp, date, time_to_str(token_transfers[tx_hash][0]['block_timestamp'])):
                         continue
                     for token_transfer in token_transfers[tx_hash]:
@@ -92,7 +97,8 @@ class ProfitChecker(Checker):
                             continue
                         src = token_transfer['from_address']
                         dst = token_transfer['to_address']
-                        amount = token_address['value']
+                        amount = int(token_transfer['value'])
+                        import IPython;IPython.embed()
                         if src == contract:
                             if account == None or account == dst:
                                 income -= amount
@@ -110,7 +116,8 @@ class ProfitChecker(Checker):
         # extract candidate attack profits for call-injection & reentrancy from raw result
         candidates = dict()
         for checker_result in attack_details:
-            if checker_result['checker'] not in ('reentrancy', 'call-injection', 'integer-overflow'):
+            # if checker_result['checker'] not in ('reentrancy', 'call-injection', 'integer-overflow'):
+            if checker_result['checker'] not in ('integer-overflow'):
                 continue
 
             candidate_profits = defaultdict(dict)
@@ -168,9 +175,9 @@ class ProfitChecker(Checker):
                     for victim in candidates[checker][profit_node][result_type]['victims']:
                         outlay += self.check_contract_income_forward(
                             victim, profit_account, time_to_str(tx.block_timestamp), result_type)
-
+                    import IPython;IPython.embed()
                     net_profit = candidates[checker][profit_node][result_type]['amount'] - outlay
-                    if net_profit > 0:
+                    if net_profit > self.minimum_profit_amount[ResultGraph.extract_result_type(result_type)]:
                         net_profits[result_type] = net_profit
 
                 if len(net_profits) > 0:

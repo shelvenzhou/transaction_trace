@@ -23,7 +23,8 @@ class Checker:
     def minimum_profit_amount(self):
         return {
             ResultType.ETHER_TRANSFER: Web3.toWei(0.00001, 'ether'),
-            ResultType.TOKEN_TRANSFER: 100
+            ResultType.TOKEN_TRANSFER: 100,
+            ResultType.TOKEN_TRANSFER_EVENT: 100,
         }
 
     @property

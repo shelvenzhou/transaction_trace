@@ -24,9 +24,9 @@ class IntegerOverflowChecker(Checker):
 
             if SensitiveAPIs.sensitive_function_call(trace['input']):
                 func_name = SensitiveAPIs.func_name(trace['input'])
-                # if func_name in SensitiveAPIs._integer_overflow_sensitive_functions:
-                #     candidates.append((e, func_name))
-                candidates.append((e, func_name))
+                if func_name in SensitiveAPIs._integer_overflow_sensitive_functions:
+                    candidates.append((e, func_name))
+                # candidates.append((e, func_name))
 
         tx = action_tree.tx
         attacks = list()
@@ -71,7 +71,7 @@ class IntegerOverflowChecker(Checker):
                 if len(profit) > 0:
                     profits[node] = profit
 
-            if len(profit) > 0:
+            if len(profits) > 0:
                 tx.is_attack = True
                 tx.attack_details.append({
                     "checker": self.name,
