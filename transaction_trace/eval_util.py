@@ -9,10 +9,26 @@ import logging
 import copy
 
 from .local import EthereumDatabase
-from .datetime_utils import time_to_str, month_to_str
+from .datetime_utils import time_to_str, month_to_str, str_to_time, str_to_date
 from .analysis.intermediate_representations import ResultType
 
 l = logging.getLogger('eval_util')
+
+token_valuable = [
+    '0x8a88f04e0c905054d2f33b26bb3a46d7091a039a',
+    '0x74fd51a98a4a1ecbef8cc43be801cce630e260bd',
+    '0x0235fe624e044a05eed7a43e16e3083bc8a4287a',
+    '0x275b69aa7c8c1d648a0557656bce1c286e69a29d',
+    '0x9d9832d1beb29cc949d75d61415fd00279f84dc2',
+    '0xf3fe733717ab28cdcb7f2dc22d06c7de858d3edf',
+    '0x1f88cac675a37b649646860746f25f58e21b99f2',
+    '0xcde3ef6cacf84ad36d8a6eccc964f25351296d36',
+    '0xc88be04c809856b75e3dfe19eb4dcf0a3b15317a',
+    '0xf69709c4c6f3f2b17978280dce8b7b7a2cbcba8b',
+    '0x8faf0be1465b9be70ee73d9123b2a1fdd9f2aae4',
+    '0x767588059265d2a243445dd3f23db37b96018dd5',
+    '0x3930e4ddb4d24ef2f4cb54c1f009a3694b708428'
+]
 
 attack_report_time = {
     'Dao': '2016-06-18',
@@ -77,6 +93,8 @@ CAD_LOG_FILE = '/home/xiangjie/logs/suicide-contract-analyzer-20190625223619.log
 CI_LOG_FILE = '/home/xiangjie/logs/call-injection-analyzer-20190607031718.log'
 HONEYPOT_LOG_FILE = '/home/xiangjie/logs/naive-honeypot.log'
 PAPERS_RESULT_FILE = '/home/xiangjie/logs/pickles/papers_result'
+
+CONTRACT_CREATE_TIME = '/home/xiangjie/logs/pickles/contract_create_time'
 
 REENTRANCY_ADDRS_MAP = '/home/xiangjie/logs/pickles/reen_addrs2target'
 
@@ -173,6 +191,10 @@ class EvalUtil:
         with open(self.papers_result_file, 'rb') as f:
             self.papers_result = pickle.load(f)
 
+        l.info("loading contract create time")
+        with open(CONTRACT_CREATE_TIME, 'rb') as f:
+            self.create_time = pickle.load(f)
+
         l.info("loading contract source code")
         # open_sourced_contract = dict()
         # etherscan_db = sqlite3.connect(
@@ -182,18 +204,54 @@ class EvalUtil:
         #         open_sourced_contract[row[0]] = row[1]
         # self.open_sourced_contract = open_sourced_contract
 
-        # l.info("loading contract create time and bytecode")
-        # create_time = dict()
+        # l.info("loading contract bytecode")
         # bytecode = dict()
         # contracts_db = EthereumDatabase(
         #     '/mnt/data/bigquery/ethereum_contracts', db_name='contracts')
         # for con in contracts_db.get_all_connnections():
         #     print(con)
         #     for row in con.read('contracts', '*'):
-        #         create_time[row['address']] = row['block_timestamp']
-        #         bytecode[row['address']] = row['bytecode']
-        # self.create_time = create_time
+                # bytecode[row['address']] = row['bytecode']
         # self.bytecode = bytecode
+
+    def eco_loss(self, time_gap):
+        reen_eth_loss = 0
+        airdrop_token_loss = defaultdict(int)
+        for tx_hash in self.txs:
+            for checker in self.txs[tx_hash]['attack_details']:
+                name = checker['checker']
+                if name == 'reentrancy':
+                    for attack in checker['attacks']:
+                        cycle = attack['cycle']
+                        cycle.sort()
+                        addrs = tuple(cycle)
+                        if addrs not in self.reen_addrs2target:
+                            continue
+                        address = self.reen_addrs2target[addrs]
+                    if str_to_time(self.txs[tx_hash]['block_timestamp']) <= self.create_time[address].replace(tzinfo=None) + time_gap:
+                        continue
+                    eth_loss = 0
+                    for node in checker['profit']:
+                        if ResultType.ETHER_TRANSFER not in checker['profit'][node]:
+                            continue
+                        if checker['profit'][node][ResultType.ETHER_TRANSFER] > eth_loss:
+                            eth_loss = checker['profit'][node][ResultType.ETHER_TRANSFER]
+                    reen_eth_loss += eth_loss
+                elif name == 'airdrop-hunting':
+                    token_address = ''
+                    m_amount = 0
+                    for node in checker['profit']:
+                        for row in checker['profit'][node][ResultType.TOKEN_TRANSFER]:
+                            amount = row[1]
+                            token = row[0]
+                            if amount > m_amount:
+                                token_address = token
+                                m_amount = amount
+                    if str_to_time(self.txs[tx_hash]['block_timestamp']) <= self.create_time[address].replace(tzinfo=None) + time_gap:
+                        continue
+                    if token_address in token_valuable:
+                        airdrop_token_loss[token_address] += amount
+        return reen_eth_loss, airdrop_token_loss
 
     def get_day2txs_and_month2txs(self):
         day2txs = dict()

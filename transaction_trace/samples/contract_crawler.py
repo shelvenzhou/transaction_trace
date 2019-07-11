@@ -107,7 +107,7 @@ async def main(db_filepath, api_key_filepath, addrs_filepath):
     count = len(bytecode_hash2contracts)
     for h in bytecode_hash2contracts:
         for addr in bytecode_hash2contracts[h]:
-            if addr in contract_in_database and h in code_in_database and code_in_database[h] != '':
+            if addr in contract_in_database and h in code_in_database:
                 continue
             if len(addr) != 42 or not addr.startswith('0x'):
                 print('not valid address')

@@ -21,9 +21,9 @@ def main(db_folder, log_path, input_log_file=None):
             tca = TransactionCentricAnalysis(log_file)
             # tca.register_transaction_centric_checker(CallInjectionChecker())
             # tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
-            tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
+            # tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
             tca.register_transaction_centric_checker(ReentrancyChecker(1))
-            tca.register_transaction_centric_checker(DestructContractChecker())
+            # tca.register_transaction_centric_checker(DestructContractChecker())
 
             for call_tree, result_graph in p.preprocess():
                 if call_tree == None:

@@ -84,6 +84,8 @@ class ReentrancyChecker(Checker):
                 candidates.append((entry, cycle, turns_count))
 
         tx = action_tree.tx
+        if tx.tx_hash == '0x21e9d20b57f6ae60dac23466c8395d47f42dc24628e5a31f224567a2b4effa88':
+            import IPython;IPython.embed()
         attacks = list()
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
@@ -136,7 +138,7 @@ class ReentrancyChecker(Checker):
                 if len(profit) > 0:
                     profits[node] = profit
 
-            if len(profit) > 0:
+            if len(profits) > 0:
                 tx.is_attack = True
                 tx.attack_details.append({
                     "checker": self.name,
