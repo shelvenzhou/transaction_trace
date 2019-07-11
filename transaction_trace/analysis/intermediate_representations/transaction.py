@@ -27,7 +27,8 @@ class Transaction:
             'tx_hash': self.tx_hash,
             'block_timestamp': time_to_str(self.block_timestamp),
             'caller': self.caller,
-            'attack_details': self.attack_details
+            'attack_details': self.attack_details,
+            'destruct_contracts': self.destruct_contracts
         }
         return str(tx_detail)
 
@@ -37,4 +38,6 @@ class Transaction:
         if len(d['attack_details']) > 0:
             tx.is_attack = True
             tx.attack_details = d['attack_details']
+        if len(d['destruct_contracts']) > 0:
+            tx.destruct_contracts = d['destruct_contracts']
         return tx

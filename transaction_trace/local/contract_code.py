@@ -11,8 +11,8 @@ class ContractCode(Database):
     def create_contracts_table(self):
         cur = self._conn.cursor()
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS contracts(
-                ContractAddress TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS source_code(
+                BytecodeHash TEXT PRIMARY KEY,
                 SourceCode TEXT,
                 ABI TEXT,
                 ContractName TEXT,
@@ -24,9 +24,25 @@ class ContractCode(Database):
                 SwarmSource TEXT
             );
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS contract_bytecode_hash(
+                ContractAddress TEXT PRIMARY KEY,
+                BytecodeHash TEXT
+            )
+        """)
 
-    def insert_contract(self, row):
-        self.insert("contracts", "", "?, ?, ?, ?, ?, ?, ?, ?, ?, ?", row)
+    def update_source_code(self, bytecode_hash, row):
+        self.delete("source_code", "WHERE BytecodeHash=?", (bytecode_hash,))
+        self.insert_source_code(row)
 
-    def read_contract(self, addr):
-        return self.read("contracts", "*", "WHERE ContractAddress=?", (addr,))
+    def insert_source_code(self, row):
+        self.insert("source_code", "", "?, ?, ?, ?, ?, ?, ?, ?, ?, ?", row)
+
+    def read_source_code(self, bytecode_hash):
+        return self.read("source_code", "*", "WHERE BytecodeHash=?", (bytecode_hash,))
+
+    def insert_contract_bytecode_hash(self, row):
+        self.insert("contract_bytecode_hash", "", "?, ?", row)
+
+    def read_contract_bytecode_hash(self, addr):
+        return self.read("contract_bytecode_hash", "*", "WHERE ContractAddress=?", (addr,))

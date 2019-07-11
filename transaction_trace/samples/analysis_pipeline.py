@@ -22,7 +22,7 @@ def main(db_folder, log_path, input_log_file=None):
             # tca.register_transaction_centric_checker(CallInjectionChecker())
             # tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
             tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
-            # tca.register_transaction_centric_checker(ReentrancyChecker(5))
+            tca.register_transaction_centric_checker(ReentrancyChecker(1))
             tca.register_transaction_centric_checker(DestructContractChecker())
 
             for call_tree, result_graph in p.preprocess():
@@ -38,11 +38,11 @@ def main(db_folder, log_path, input_log_file=None):
                     d = eval(line.strip('\n'))
                     candidates.append(Transaction.from_dict(d))
 
-        cca = ContractCentricAnalysis(db_folder, log_file)
-        cca.register_contract_centric_checker(ProfitChecker())
-        cca.register_contract_centric_checker(CallAfterDestructChecker(log_file))
+        # cca = ContractCentricAnalysis(db_folder, log_file)
+        # cca.register_contract_centric_checker(ProfitChecker())
+        # cca.register_contract_centric_checker(CallAfterDestructChecker(log_file))
 
-        cca.do_analysis(candidates)
+        # cca.do_analysis(candidates)
 
 
 

@@ -24,9 +24,9 @@ class TransactionCentricAnalysis(TraceAnalysis):
         for checker_name, checker in self.checkers.items():
             checker.check_transaction(call_tree, result_graph)
 
-        # tx = call_tree.tx
-        # if tx.is_attack:
-        #     l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
-        #         set([attack['checker'] for attack in tx.attack_details])))
-        # if tx.is_attack or len(tx.destruct_contracts) > 0:
-        #     self.record_abnormal_detail(tx.to_string())
+        tx = call_tree.tx
+        if tx.is_attack:
+            l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
+                set([attack['checker'] for attack in tx.attack_details])))
+        if tx.is_attack or len(tx.destruct_contracts) > 0:
+            self.record_abnormal_detail(tx.to_string())

@@ -63,7 +63,7 @@ def main(db_folder, db_name, crawl_time_path, time_interval, to_time, from_time)
         from_time = str_to_date(from_time)
     t_time = from_time + timedelta(hours=int(time_interval))
 
-    while from_time <= str_to_date(to_time):
+    while from_time.date() <= str_to_date(to_time).date():
         date = from_time.date()
         date_str = date_to_str(date)
         db_filepath = os.path.join(db_folder, db_filename(db_name, date_str))

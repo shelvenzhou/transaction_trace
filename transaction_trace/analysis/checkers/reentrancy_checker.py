@@ -94,7 +94,7 @@ class ReentrancyChecker(Checker):
             for e in prg.edges():
                 result = dict()
                 for result_type in prg.edges[e]:
-                    rt = ResultGraph.extract_result_type(result)
+                    rt = ResultGraph.extract_result_type(result_type)
                     if rt == ResultType.OWNER_CHANGE:
                         continue
                     elif rt == ResultType.ETHER_TRANSFER:
@@ -124,14 +124,14 @@ class ReentrancyChecker(Checker):
                     continue
                 profit = dict()
                 for result_type in rg.g.nodes[node]:
-                    rt = ResultGraph.extract_result_type(result)
+                    rt = ResultGraph.extract_result_type(result_type)
                     if rt == ResultType.OWNER_CHANGE:
                         continue
                     elif rt == ResultType.ETHER_TRANSFER:
                         if rg.g.nodes[node][result_type] > self.minimum_profit_amount[result_type]:
                             profit[result_type] = rg.g.nodes[node][result_type]
                     elif rt == ResultType.TOKEN_TRANSFER_EVENT:
-                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER_EVENT]:
+                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
                             profit[result_type] = rg.g.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit

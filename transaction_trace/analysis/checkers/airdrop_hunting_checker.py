@@ -51,7 +51,7 @@ class AirdropHuntingChecker(Checker):
             profits = dict()
             for node in rg.g.nodes():
                 profit = dict()
-                if result_type in rg.g.nodes[node]:
+                for result_type in rg.g.nodes[node]:
                     if ResultGraph.extract_result_type(result_type) != ResultType.TOKEN_TRANSFER_EVENT:
                         continue
                     if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:

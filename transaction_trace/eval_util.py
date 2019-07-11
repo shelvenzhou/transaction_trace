@@ -6,12 +6,29 @@ import pickle
 from web3 import Web3
 from hashlib import sha256
 import logging
+import copy
 
 from .local import EthereumDatabase
 from .datetime_utils import time_to_str, month_to_str
 from .analysis.intermediate_representations import ResultType
 
 l = logging.getLogger('eval_util')
+
+attack_report_time = {
+    'Dao': '2016-06-18',
+    'SpankChain': '2018-10-09'
+}
+
+white_hat_group = {
+    '0x69670b0c1b100739812415dd474804bb32b3aeca': 'WHG 1',
+    '0x3abe5285ed57c8b028d62d30c456ca9eb3e74105': 'WHG: Choose Return Address',
+    '0x1dba1131000664b884a1ba238464159892252d3a': 'WHG: Jordi Baylina',
+    '0xac80cba14c08f8a1242ebd0fd45881cfee54b0a2': 'WhiteHatDAOContractController',
+    '0xb136707642a4ea12fb4bae820f03d2562ebff487': 'WhiteHatDAO',
+    '0x84ef4b2357079cd7a7c69fd7a37cd0609a679106': 'WhitehatDao2',
+    '0x2ba9d006c1d72e67a70b5526fc6b4b0c0fd6d334': 'WhiteHatDAOExploitContract'
+}
+
 
 define_map = {
     'vandal': {
@@ -157,26 +174,26 @@ class EvalUtil:
             self.papers_result = pickle.load(f)
 
         l.info("loading contract source code")
-        open_sourced_contract = dict()
-        etherscan_db = sqlite3.connect(
-            '/home/xiangjie/database/etherscan.sqlite3')
-        for row in etherscan_db.execute('select ContractAddress, SourceCode from contracts'):
-            if row[1] != '':
-                open_sourced_contract[row[0]] = row[1]
-        self.open_sourced_contract = open_sourced_contract
+        # open_sourced_contract = dict()
+        # etherscan_db = sqlite3.connect(
+        #     '/home/xiangjie/database/etherscan.sqlite3')
+        # for row in etherscan_db.execute('select ContractAddress, SourceCode from contracts'):
+        #     if row[1] != '':
+        #         open_sourced_contract[row[0]] = row[1]
+        # self.open_sourced_contract = open_sourced_contract
 
-        l.info("loading contract create time and bytecode")
-        create_time = dict()
-        bytecode = dict()
-        contracts_db = EthereumDatabase(
-            '/mnt/data/bigquery/ethereum_contracts', db_name='contracts')
-        for con in contracts_db.get_all_connnections():
-            print(con)
-            for row in con.read('contracts', '*'):
-                create_time[row['address']] = row['block_timestamp']
-                bytecode[row['address']] = row['bytecode']
-        self.create_time = create_time
-        self.bytecode = bytecode
+        # l.info("loading contract create time and bytecode")
+        # create_time = dict()
+        # bytecode = dict()
+        # contracts_db = EthereumDatabase(
+        #     '/mnt/data/bigquery/ethereum_contracts', db_name='contracts')
+        # for con in contracts_db.get_all_connnections():
+        #     print(con)
+        #     for row in con.read('contracts', '*'):
+        #         create_time[row['address']] = row['block_timestamp']
+        #         bytecode[row['address']] = row['bytecode']
+        # self.create_time = create_time
+        # self.bytecode = bytecode
 
     def get_day2txs_and_month2txs(self):
         day2txs = dict()
@@ -232,6 +249,86 @@ class EvalUtil:
                 month2txs[m]['call-injection'].add(tx_hash)
 
         self.day2txs, self.month2txs = day2txs, month2txs
+
+    def analyze_spankchain(self):
+        attack_before_report = {
+            'txs': list(),
+            'eth_lost': 0
+        }
+        attack_after_report = copy.deepcopy(attack_before_report)
+        for tx_hash in self.txs:
+            for checker in self.txs[tx_hash]['attack_details']:
+                name = checker['checker']
+                if name != 'reentrancy':
+                    continue
+                spankchain = False
+                for attack in checker['attacks']:
+                    if '0xf91546835f756da0c10cfa0cda95b15577b84aa7' in attack['cycle']:
+                        spankchain = True
+                        break
+                if not spankchain:
+                    continue
+
+                eth_lost = 0
+                for node in checker['profit']:
+                    if node in white_hat_group:
+                        caller = 'white_hat'
+                    if ResultType.ETHER_TRANSFER not in checker['profit'][node]:
+                        continue
+                    if checker['profit'][node][ResultType.ETHER_TRANSFER] > eth_lost:
+                        eth_lost = checker['profit'][node][ResultType.ETHER_TRANSFER]
+
+                if self.txs[tx_hash]['block_timestamp'] <= attack_report_time['SpankChain']:
+                    attack_before_report['txs'].append(tx_hash)
+                    attack_before_report['eth_lost'] += Web3.fromWei(eth_lost, 'ether')
+                else:
+                    attack_after_report['txs'].append(tx_hash)
+                    attack_after_report['eth_lost'] += Web3.fromWei(eth_lost, 'ether')
+        return attack_before_report, attack_after_report
+
+
+    def analyze_dao(self):
+        attack_before_report = {
+            'white_hat': {
+                'txs': list(),
+                'eth_lost': 0
+            },
+            'hacker': {
+                'txs': list(),
+                'eth_lost': 0
+            }
+        }
+        attack_after_report = copy.deepcopy(attack_before_report)
+        for tx_hash in self.txs:
+            for checker in self.txs[tx_hash]['attack_details']:
+                name = checker['checker']
+                if name != 'reentrancy':
+                    continue
+                dao = False
+                for attack in checker['attacks']:
+                    if '0xd2e16a20dd7b1ae54fb0312209784478d069c7b0' in attack['cycle']:
+                        dao = True
+                        break
+                if not dao:
+                    continue
+
+                caller = 'white_hat' if self.txs[tx_hash]['caller'] in white_hat_group else 'hacker'
+                eth_lost = 0
+                for node in checker['profit']:
+                    if node in white_hat_group:
+                        caller = 'white_hat'
+                    if ResultType.ETHER_TRANSFER not in checker['profit'][node]:
+                        continue
+                    if checker['profit'][node][ResultType.ETHER_TRANSFER] > eth_lost:
+                        eth_lost = checker['profit'][node][ResultType.ETHER_TRANSFER]
+
+                if self.txs[tx_hash]['block_timestamp'] <= attack_report_time['Dao']:
+                    attack_before_report[caller]['txs'].append(tx_hash)
+                    attack_before_report[caller]['eth_lost'] += Web3.fromWei(eth_lost, 'ether')
+                else:
+                    attack_after_report[caller]['txs'].append(tx_hash)
+                    attack_after_report[caller]['eth_lost'] += Web3.fromWei(eth_lost, 'ether')
+        return attack_before_report, attack_after_report
 
     def get_vuls_info(self):
         vul2txs = defaultdict(set)
