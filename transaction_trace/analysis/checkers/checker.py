@@ -1,4 +1,5 @@
 import sys
+
 from web3 import Web3
 
 from ..intermediate_representations import ResultType

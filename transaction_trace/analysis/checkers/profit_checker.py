@@ -1,10 +1,10 @@
-from .checker import Checker, CheckerType
-from ..intermediate_representations import ResultType, ResultGraph
-from ...local import DatabaseName
-from ...datetime_utils import date_to_str, time_to_str
-
-from collections import defaultdict
 import logging
+from collections import defaultdict
+
+from ...datetime_utils import date_to_str, time_to_str
+from ...local import DatabaseName
+from ..intermediate_representations import ResultGraph, ResultType
+from .checker import Checker, CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.checkers.ProfitChecker")
 
@@ -92,7 +92,7 @@ class ProfitChecker(Checker):
                             continue
                         src = token_transfer['from_address']
                         dst = token_transfer['to_address']
-                        amount = token_address['value']
+                        amount = int(token_transfer['value'])
                         if src == contract:
                             if account == None or account == dst:
                                 income -= amount

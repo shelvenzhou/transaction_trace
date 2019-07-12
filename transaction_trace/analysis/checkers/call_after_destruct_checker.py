@@ -1,13 +1,13 @@
-from .checker import Checker
+import logging
+from collections import defaultdict
+
+from ...datetime_utils import time_to_str
 from ...local import DatabaseName
 from ..knowledge import SensitiveAPIs
-from ...datetime_utils import time_to_str
+from .checker import Checker, CheckerType
 
+l = logging.getLogger("transaction-trace.analysis.checkers.CallAfterDestructChecker")
 
-from collections import defaultdict
-import logging
-
-l = logging.getLogger("transaction-trace.analysis.checkers.CADChecker")
 
 class CallAfterDestructChecker(Checker):
 
@@ -16,6 +16,9 @@ class CallAfterDestructChecker(Checker):
         self.database = None
         self.log_file = log_file
 
+    @property
+    def checker_type(self):
+        return CheckerType.CONTRACT_CENTRIC
 
     def do_check(self, txs, db):
         if self.database == None:

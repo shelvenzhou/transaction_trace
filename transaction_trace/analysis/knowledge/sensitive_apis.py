@@ -17,11 +17,12 @@ def patched_zip(dst, amount):
         for _dst, _amount in zip(dst, amount):
             yield _dst, _amount
 
+
 def extract_function_signature(input_data):
     if input_data is None:
         return None
 
-    return input_data[:10] if len(input_data) > 10 else '0xfallback'
+    return input_data[:10] if len(input_data) >= 10 else '0xfallback'
 
 
 def _read_data_from_stream(self, stream):

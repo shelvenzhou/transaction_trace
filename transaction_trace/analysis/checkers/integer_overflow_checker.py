@@ -1,6 +1,6 @@
-from .checker import Checker, CheckerType
 from ..intermediate_representations import ResultGraph, ResultType
 from ..knowledge import SensitiveAPIs
+from .checker import Checker, CheckerType
 
 
 class IntegerOverflowChecker(Checker):
@@ -55,7 +55,6 @@ class IntegerOverflowChecker(Checker):
                     'results': results
                 })
 
-
         if len(attacks) > 0:
             rg = result_graph
             profits = dict()
@@ -71,7 +70,7 @@ class IntegerOverflowChecker(Checker):
                 if len(profit) > 0:
                     profits[node] = profit
 
-            if len(profit) > 0:
+            if len(profits) > 0:
                 tx.is_attack = True
                 tx.attack_details.append({
                     "checker": self.name,

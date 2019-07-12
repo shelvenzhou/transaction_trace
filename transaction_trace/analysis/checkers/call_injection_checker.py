@@ -1,8 +1,8 @@
-from .checker import Checker, CheckerType
-from ..intermediate_representations import ActionTree, ResultGraph, ResultType, extract_address_from_node
+from ..intermediate_representations import (ActionTree, ResultGraph,
+                                            ResultType,
+                                            extract_address_from_node)
 from ..knowledge import SensitiveAPIs, extract_function_signature
-
-from collections import defaultdict
+from .checker import Checker, CheckerType
 
 
 class CallInjectionChecker(Checker):
@@ -15,15 +15,20 @@ class CallInjectionChecker(Checker):
         return CheckerType.TRANSACTION_CENTRIC
 
     def check_transaction(self, action_tree, result_graph):
+        tx = action_tree.tx
+        at = action_tree.t
+        rg = result_graph.g
+
         candidates = list()
-        # search for call-injection candidates edge by edge
-        edges = action_tree.t.edges()
-        if len(edges) < 2:
+
+        if len(at.edges()) < 2:
             return
-        for e in edges:
+
+        for e in at.edges():
             from_address = extract_address_from_node(e[0])
             to_address = extract_address_from_node(e[1])
-            trace = action_tree.t.edges[e]
+            trace = at.edges[e]
+
             # call-injection only happens when the trace type is "call"
             if trace['trace_type'] != "call":
                 continue
@@ -34,16 +39,20 @@ class CallInjectionChecker(Checker):
                 self_loop = True
             # check input-control
             if self_loop:
-                parent_edge = list(action_tree.t.in_edges(e[0]))[0]
-                parent_trace = action_tree.t.edges[parent_edge]
+                # call injection is infeasible for delegatecall
+                if trace['call_type'] == "delegatecall":
+                    continue
 
-                callee = extract_function_signature(trace['input'])
+                if len(at.in_edges(e[0])) == 0:
+                    continue
+                parent_edge = list(at.in_edges(e[0]))[0]
+                parent_trace = at.edges[parent_edge]
 
-                parent_trace_input = parent_trace['input']
-
+                called_func = extract_function_signature(trace['input'])
+                parent_input = parent_trace['input']
                 # TODO: not consider fallback function in "call" may cause FN, but also reduce FP on same func-name
-                if len(parent_trace_input) > 10:
-                    if callee[2:] in (parent_trace_input if trace['call_type'] == "delegatecall" else parent_trace_input[10:]):
+                if len(parent_input) > 10:
+                    if called_func[2:] in (parent_input if trace['call_type'] == "delegatecall" else parent_input[10:]):
                         input_control = True
                     else:
                         encoded_functions = SensitiveAPIs.encoded_functions()
@@ -53,10 +62,9 @@ class CallInjectionChecker(Checker):
                                 if encoded_callee in parent_trace_input[10:]:
                                     input_control = True
 
-            if self_loop and input_control:
-                candidates.append((e, parent_edge))
+                if input_control:
+                    candidates.append((e, parent_edge))
 
-        tx = action_tree.tx
         attacks = list()
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
