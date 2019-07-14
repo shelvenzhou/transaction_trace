@@ -22,8 +22,7 @@ class ContractCode(Database):
                 `is_erc721` BOOLEAN,
                 `block_timestamp` TIMESTAMP NOT NULL,
                 `block_number` INT NOT NULL,
-                `block_hash` char(66) NOT NULL,
-                INDEX `bytecode_hash_index` (`bytecode_hash`)
+                `block_hash` char(66) NOT NULL
             );
         """)
         cur.execute("""
@@ -46,3 +45,11 @@ class ContractCode(Database):
 
     def insert_source_code(self, row):
         self.insert("source_code", "", "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s", row)
+
+    def create_bytecode_index(self):
+        cur = self._conn.cursor()
+        cur.execute("CREATE INDEX `bytecode_hash_index` ON `byte_code`(`bytecode_hash`);")
+
+    def create_source_code_index(self):
+        cur = self._conn.cursor()
+        cur.execute("CREATE FULLTEXT INDEX `source_code_index` ON `source_code`(`source_code`);")
