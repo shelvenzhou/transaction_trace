@@ -6,7 +6,8 @@ import re
 from sortedcontainers import SortedList
 
 from ..datetime_utils import date_to_str, str_to_date
-from .single_database import SingleTraceDatabase
+from .database_name import DatabaseName
+from .single_database import SingleDatabaseFactory, SingleTraceDatabase
 
 l = logging.getLogger("transaction-trace.local.ethereum_database")
 
@@ -28,7 +29,7 @@ def db_filename(db_name, date):
 
 class EthereumDatabase:
 
-    def __init__(self, db_folder, db_name="traces", cache_capacity=20):
+    def __init__(self, db_folder, db_name=DatabaseName.TRACE_DATABASE, cache_capacity=20):
         self._db_folder = db_folder
         self._db_name = db_name
 
@@ -64,7 +65,7 @@ class EthereumDatabase:
 
         db_filepath = os.path.join(
             self._db_folder, db_filename(self._db_name, date))
-        db = SingleTraceDatabase(db_filepath, date)
+        db = SingleDatabaseFactory.get_single_database(self._db_name)(db_filepath, date)
         self._connection_access.append(date)
         self._connection_cache[date] = db
         return db

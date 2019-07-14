@@ -15,7 +15,7 @@ class ContractCentricAnalysis(TraceAnalysis):
         super(ContractCentricAnalysis, self).__init__(db_folder, log_file, [
             DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
         tx_index_db = ContractTransactions(
-            "", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
+            user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
         self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE] = tx_index_db
 
         self.checkers = dict()

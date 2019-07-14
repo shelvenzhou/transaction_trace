@@ -4,6 +4,7 @@ import sqlite3
 
 from ..datetime_utils import date_to_str, str_to_date, str_to_time
 from .database import Database
+from .database_name import DatabaseName
 
 
 def adapt_decimal(d):
@@ -44,7 +45,24 @@ sqlite3.register_adapter(decimal.Decimal, adapt_decimal)
 sqlite3.register_adapter(list, lambda x: str(x))
 
 
+class SingleDatabaseFactory():
+
+    @staticmethod
+    def get_single_database(db_name):
+        database_mapping = {
+            DatabaseName.TRACE_DATABASE: SingleTraceDatabase,
+            DatabaseName.BLOCK_DATABASE: SingleBlockDatabase,
+            DatabaseName.TRANSACTION_DATABASE: SingleTransactionDatabase,
+            DatabaseName.TOKEN_TRANSFER_DATABASE: SingleTokenTransferDatabase,
+            DatabaseName.CONTRACT_DATABASE: SingleContractDatabase,
+            DatabaseName.LOG_DATABASE: SingleLogDatabase
+        }
+
+        return database_mapping[db_name]
+
+
 class SingleTraceDatabase(Database):
+
     def __init__(self, db_filepath, date):
         super(SingleTraceDatabase, self).__init__(db_filepath, date)
 
@@ -154,6 +172,7 @@ class SingleTraceDatabase(Database):
 
 
 class SingleBlockDatabase(Database):
+
     def __init__(self, db_filepath, date):
         super(SingleBlockDatabase, self).__init__(db_filepath, date)
 
@@ -197,6 +216,7 @@ class SingleBlockDatabase(Database):
 
 
 class SingleTransactionDatabase(Database):
+
     def __init__(self, db_filepath, date):
         super(SingleTransactionDatabase, self).__init__(db_filepath, date)
 
@@ -239,6 +259,7 @@ class SingleTransactionDatabase(Database):
 
 
 class SingleTokenTransferDatabase(Database):
+
     def __init__(self, db_filepath, date):
         super(SingleTokenTransferDatabase, self).__init__(db_filepath, date)
 
@@ -276,6 +297,7 @@ class SingleTokenTransferDatabase(Database):
 
 
 class SingleContractDatabase(Database):
+
     def __init__(self, db_filepath, date):
         super(SingleContractDatabase, self).__init__(db_filepath, date)
 
@@ -310,7 +332,15 @@ class SingleContractDatabase(Database):
             rows=rows
         )
 
+    def read_contracts(self):
+        return self.read(
+            table="contracts",
+            columns="*",
+        )
+
+
 class SingleLogDatabase(Database):
+
     def __init__(self, db_filepath, date):
         super(SingleLogDatabase, self).__init__(db_filepath, date)
 
