@@ -1,6 +1,5 @@
-from ..intermediate_representations import (ActionTree, ResultGraph,
-                                            ResultType,
-                                            extract_address_from_node)
+from ..intermediate_representations import (
+    ActionTree, ResultGraph, ResultType, extract_address_from_node, AttackCandidate)
 from ..knowledge import SensitiveAPIs, extract_function_signature
 from .checker import Checker, CheckerType
 
@@ -52,31 +51,28 @@ class CallInjectionChecker(Checker):
                 parent_input = parent_trace['input']
                 # TODO: not consider fallback function in "call" may cause FN, but also reduce FP on same func-name
                 if len(parent_input) > 10:
-                    if called_func[2:] in (parent_input if trace['call_type'] == "delegatecall" else parent_input[10:]):
+                    if called_func[2:] in parent_input[10:]:
                         input_control = True
                     else:
                         encoded_functions = SensitiveAPIs.encoded_functions()
                         for t in encoded_functions:
                             if callee in encoded_functions[t]:
                                 encoded_callee = encoded_functions[t][callee]
-                                if encoded_callee in parent_trace_input[10:]:
+                                if encoded_callee in parent_input[10:]:
                                     input_control = True
 
                 if input_control:
                     candidates.append((e, parent_edge))
 
+        # TODO: we've already remove `delegatecall` cases, is this still necessary?
         attacks = list()
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (e, parent_edge) in candidates:
-            ancestors = ActionTree.get_ancestors_from_tree(action_tree.t, e[0])
-            call_type = action_tree.t.edges[e]['call_type']
+            ancestors = ActionTree.get_ancestors_from_tree(at, e[0])
+            call_type = at.edges[e]['call_type']
 
-            # only consider the direct trace result graph when "delegatecall"
-            direct_trace = True if call_type == "delegatecall" else False
-            prg = ResultGraph.build_partial_result_graph(
-                result_graph.t, e[0], direct_trace)
-
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, e[0])
             results = dict()
             for e in prg.edges():
                 if e[1] not in ancestors:
@@ -100,19 +96,18 @@ class CallInjectionChecker(Checker):
 
             if len(results) > 0:
                 attacks.append({
-                    "edge": parent_edge,
+                    "entry_edge": parent_edge,
                     'results': results
                 })
 
         if len(attacks) > 0:
             # compute whole transaction economic lost
-            rg = result_graph
             profits = dict()
-            for node in rg.g.nodes():
+            for node in rg.nodes():
                 if node not in sensitive_nodes:
                     continue
                 profit = dict()
-                for result_type in rg.g.nodes[node]:
+                for result_type in rg.nodes[node]:
                     rt = ResultGraph.extract_result_type(result_type)
                     if rt == ResultType.OWNER_CHANGE:
                         profit[result_type] = None
@@ -127,8 +122,13 @@ class CallInjectionChecker(Checker):
 
             if len(profit) > 0:
                 tx.is_attack = True
-                tx.attack_details.append({
-                    "checker": self.name,
-                    "attacks": attacks,
-                    "profit": profits
-                })
+                tx.attack_details.append(
+                    AttackCandidate(
+                        self.name,
+                        {
+                            "transaction": tx.tx_hash,
+                            "attacks": attacks,
+                        },
+                        profits,
+                    )
+                )
