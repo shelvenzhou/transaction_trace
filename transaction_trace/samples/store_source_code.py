@@ -2,6 +2,7 @@ import json
 import logging
 import pickle
 import sys
+import string
 
 import transaction_trace
 from transaction_trace.local import ContractCode, EthereumDatabase
@@ -9,6 +10,8 @@ from transaction_trace.local.database_name import DatabaseName
 
 l = logging.getLogger("store_source_code")
 
+
+printable = set(string.printable)
 
 def main(bytecode_db_folder, source_code_filepath, bytecode_hash_index, mysql_password, cache_len=100000):
     l.info("open bytecode databases in %s", bytecode_db_folder)
@@ -57,6 +60,9 @@ def main(bytecode_db_folder, source_code_filepath, bytecode_hash_index, mysql_pa
     for s in source_codes:
         if s["SourceCode"] == "":
             continue
+
+        # remove illegal characters
+        s["SourceCode"] = ''.join(filter(lambda x: x in printable, s["SourceCode"]))
 
         db_cache.append([s[k] for k in sourcecode_cols])
         if len(db_cache) > cache_len:
