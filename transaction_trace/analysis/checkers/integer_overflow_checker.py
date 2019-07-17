@@ -14,11 +14,13 @@ class IntegerOverflowChecker(Checker):
         return CheckerType.TRANSACTION_CENTRIC
 
     def check_transaction(self, action_tree, result_graph):
+        tx = action_tree.tx
+        at = action_tree.t
+        rg = result_graph.g
+
         candidates = list()
-        # search for integer-overflow candidates edge by edge
-        edges = action_tree.t.edges()
-        for e in edges:
-            trace = action_tree.t.edges[e]
+        for e in at.edges():
+            trace = at.edges[e]
             if trace['trace_type'] != "call":
                 continue
 
@@ -28,12 +30,11 @@ class IntegerOverflowChecker(Checker):
                 #     candidates.append((e, func_name))
                 candidates.append((e, func_name))
 
-        tx = action_tree.tx
         attacks = list()
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (edge, func_name) in candidates:
-            prg = ResultGraph.build_partial_result_graph(result_graph.t, edge[0], True)
+            prg = ResultGraph.build_partial_result_graph(at, edge[0], True)
 
             results = dict()
             for e in prg.edges():

@@ -50,16 +50,19 @@ class ReentrancyChecker(Checker):
         return entry, turns_count
 
     def check_transaction(self, action_tree, result_graph):
-        edges = action_tree.t.edges()
-        if len(edges) < 2 * self.threshold:
+        tx = action_tree.tx
+        at = action_tree.t
+        rg = result_graph.g
+
+        if len(at.edges()) < 2 * self.threshold:
             return
 
         # build call graph to find cycles
         g = nx.DiGraph()
-        for e in edges:
+        for e in at.edges():
             from_address = extract_address_from_node(e[0])
             to_address = extract_address_from_node(e[1])
-            trace = action_tree.t.edges[e]
+            trace = at.edges[e]
 
             g.add_edge(from_address, to_address)
             if "call_traces" not in g[from_address][to_address]:
@@ -74,7 +77,7 @@ class ReentrancyChecker(Checker):
         candidates = list()
         # search for reentrancy candidates cycle by cycle
         cycles = list(nx.simple_cycles(g))
-        if len(cycles) < 1:
+        if len(cycles) == 0:
             return
 
         for cycle in cycles:
@@ -84,12 +87,11 @@ class ReentrancyChecker(Checker):
             if turns_count > self.threshold:
                 candidates.append((entry, cycle, turns_count))
 
-        tx = action_tree.tx
         attacks = list()
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (entry, cycle, turns_count) in candidates:
-            prg = ResultGraph.build_partial_result_graph(result_graph.t, entry)
+            prg = ResultGraph.build_partial_result_graph(at, entry)
 
             results = dict()
             for e in prg.edges():
