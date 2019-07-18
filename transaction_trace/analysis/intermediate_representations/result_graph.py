@@ -4,7 +4,9 @@ import networkx as nx
 from networkx.algorithms.traversal import dfs_edges
 
 from ..knowledge import SensitiveAPIs
-from . import ActionTree, ResultType, Transaction
+from .action_tree import ActionTree
+from .result_type import ResultType
+from .transaction import Transaction
 
 l = logging.getLogger(
     "transaction-trace.analysis.intermediate_representations.ResultGraph")

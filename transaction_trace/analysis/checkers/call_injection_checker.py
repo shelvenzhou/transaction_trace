@@ -1,7 +1,7 @@
 from ..intermediate_representations import (ActionTree, AttackCandidate,
                                             ResultGraph, ResultType)
 from ..knowledge import SensitiveAPIs, extract_function_signature
-from . import Checker, CheckerType
+from .checker import Checker, CheckerType
 
 
 class CallInjectionChecker(Checker):

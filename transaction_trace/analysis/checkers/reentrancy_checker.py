@@ -3,7 +3,7 @@ from collections import defaultdict
 import networkx as nx
 
 from ..intermediate_representations import ActionTree, ResultGraph, ResultType
-from . import Checker, CheckerType
+from .checker import Checker, CheckerType
 
 
 class ReentrancyChecker(Checker):
@@ -91,7 +91,7 @@ class ReentrancyChecker(Checker):
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (entry, cycle, turns_count) in candidates:
-            prg = ResultGraph.build_partial_result_graph(at, entry)
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, entry)
 
             results = dict()
             for e in prg.edges():

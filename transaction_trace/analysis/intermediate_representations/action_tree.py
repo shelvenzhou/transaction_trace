@@ -1,6 +1,6 @@
 import networkx as nx
 
-from . import Transaction
+from .transaction import Transaction
 
 
 class ActionTree:

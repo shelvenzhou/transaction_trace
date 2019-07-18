@@ -1,6 +1,6 @@
 from ..intermediate_representations import ResultGraph, ResultType
 from ..knowledge import SensitiveAPIs
-from . import Checker, CheckerType
+from .checker import Checker, CheckerType
 
 
 class IntegerOverflowChecker(Checker):
@@ -34,7 +34,7 @@ class IntegerOverflowChecker(Checker):
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (edge, func_name) in candidates:
-            prg = ResultGraph.build_partial_result_graph(at, edge[0], True)
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, edge[0], True)
 
             results = dict()
             for e in prg.edges():
