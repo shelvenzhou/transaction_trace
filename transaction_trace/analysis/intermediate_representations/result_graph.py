@@ -4,9 +4,7 @@ import networkx as nx
 from networkx.algorithms.traversal import dfs_edges
 
 from ..knowledge import SensitiveAPIs
-from . import ResultType
-from .action_tree import extract_address_from_node
-from .transaction import Transaction
+from . import ActionTree, ResultType, Transaction
 
 l = logging.getLogger(
     "transaction-trace.analysis.intermediate_representations.ResultGraph")
@@ -96,8 +94,8 @@ class ResultGraph:
         for e in edges:
             for result_type in result_tree.edges[e]:
                 if result_type == ResultType.ETHER_TRANSFER:
-                    src = extract_address_from_node(e[0])
-                    dst = extract_address_from_node(e[1])
+                    src = ActionTree.extract_address_from_node(e[0])
+                    dst = ActionTree.extract_address_from_node(e[1])
                     if src == dst:
                         continue
                     amount = result_tree.edges[e][result_type]
@@ -106,7 +104,7 @@ class ResultGraph:
                         src, dst, amount, result_type, graph)
 
                 elif result_type == ResultType.TOKEN_TRANSFER:
-                    token_address = extract_address_from_node(e[1])
+                    token_address = ActionTree.extract_address_from_node(e[1])
                     for (src, dst, amount) in result_tree.edges[e][result_type]:
                         if src == dst:
                             continue

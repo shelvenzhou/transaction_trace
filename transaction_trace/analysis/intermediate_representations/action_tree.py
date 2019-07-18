@@ -1,29 +1,29 @@
 import networkx as nx
 
-from .transaction import Transaction
-
-
-def get_edges_from_cycle(cycle):
-    edges = []
-    for i in range(1, len(cycle)):
-        edges.append((cycle[i - 1], cycle[i]))
-    edges.append((cycle[-1], cycle[0]))
-    return edges
-
-
-def encode_node(trace_id, address):
-    return str(trace_id) + ":" + address
-
-
-def extract_address_from_node(node):
-    return node.split(":")[1]
-
-
-def extract_trace_id_from_node(node):
-    return node.split(":")[0]
+from . import Transaction
 
 
 class ActionTree:
+
+    @staticmethod
+    def get_edges_from_cycle(cycle):
+        edges = []
+        for i in range(1, len(cycle)):
+            edges.append((cycle[i - 1], cycle[i]))
+        edges.append((cycle[-1], cycle[0]))
+        return edges
+
+    @staticmethod
+    def encode_node(trace_id, address):
+        return str(trace_id) + ":" + address
+
+    @staticmethod
+    def extract_address_from_node(node):
+        return node.split(":")[1]
+
+    @staticmethod
+    def extract_trace_id_from_node(node):
+        return node.split(":")[0]
 
     def __init__(self, tx, tree, errs):
         self.tx = tx
@@ -46,7 +46,7 @@ class ActionTree:
                 entry = None
             else:
                 entry = parent_edges[0][0]
-                node = extract_address_from_node(entry)
+                node = ActionTree.extract_address_from_node(entry)
                 ancestors.add(node)
         return ancestors
 
@@ -74,11 +74,11 @@ class ActionTree:
             # when A delegatecalls B, the msg.sender is still A
             # so it just like that A copys the code of B and calls its own code
             if trace['trace_type'] == 'call' and trace['call_type'] == 'delegatecall':
-                from_node = encode_node(parent_trace_id, trace['from_address'])
-                to_node = encode_node(trace_id, trace['from_address'])
+                from_node = ActionTree.encode_node(parent_trace_id, trace['from_address'])
+                to_node = ActionTree.encode_node(trace_id, trace['from_address'])
             else:
-                from_node = encode_node(parent_trace_id, trace['from_address'])
-                to_node = encode_node(trace_id, trace['to_address'])
+                from_node = ActionTree.encode_node(parent_trace_id, trace['from_address'])
+                to_node = ActionTree.encode_node(trace_id, trace['to_address'])
 
             if trace['status'] == 0:
                 errs.append({

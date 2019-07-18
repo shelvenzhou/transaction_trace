@@ -2,8 +2,8 @@ import logging
 from collections import defaultdict
 from datetime import timedelta, timezone
 
-from ..datetime_utils import str_to_date, time_to_str
-from .trace_analysis import TraceAnalysis
+from ...datetime_utils import str_to_date, time_to_str
+from ..trace_analysis import TraceAnalysis
 
 l = logging.getLogger("transaction-trace.analysis.Honeypot")
 

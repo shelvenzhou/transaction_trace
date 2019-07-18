@@ -1,6 +1,6 @@
 from ..intermediate_representations import ResultGraph, ResultType
 from ..knowledge import SensitiveAPIs
-from .checker import Checker, CheckerType
+from . import Checker, CheckerType
 
 
 class IntegerOverflowChecker(Checker):

@@ -2,8 +2,8 @@ from collections import defaultdict
 
 import networkx as nx
 
-from ..intermediate_representations import *
-from .checker import Checker, CheckerType
+from ..intermediate_representations import ActionTree, ResultGraph, ResultType
+from . import Checker, CheckerType
 
 
 class ReentrancyChecker(Checker):
@@ -17,7 +17,7 @@ class ReentrancyChecker(Checker):
         return CheckerType.TRANSACTION_CENTRIC
 
     def count_cycle_turns(self, graph, cycle):
-        edges = get_edges_from_cycle(cycle)
+        edges = ActionTree.get_edges_from_cycle(cycle)
         walk = {'max_height': 0, 'trace_id': 0, 'edge': ()}
         call_traces = dict()
 
@@ -60,8 +60,8 @@ class ReentrancyChecker(Checker):
         # build call graph to find cycles
         g = nx.DiGraph()
         for e in at.edges():
-            from_address = extract_address_from_node(e[0])
-            to_address = extract_address_from_node(e[1])
+            from_address = ActionTree.extract_address_from_node(e[0])
+            to_address = ActionTree.extract_address_from_node(e[1])
             trace = at.edges[e]
 
             g.add_edge(from_address, to_address)
@@ -69,8 +69,8 @@ class ReentrancyChecker(Checker):
                 g[from_address][to_address]["call_traces"] = list()
 
             g[from_address][to_address]["call_traces"].append({
-                "trace_id": extract_trace_id_from_node(e[1]),
-                "parent_trace_id": extract_trace_id_from_node(e[0]),
+                "trace_id": ActionTree.extract_trace_id_from_node(e[1]),
+                "parent_trace_id": ActionTree.extract_trace_id_from_node(e[0]),
                 "height": len(trace["trace_address"]) if trace["trace_address"] != None else 0,
             })
 

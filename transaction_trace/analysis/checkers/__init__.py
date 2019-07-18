@@ -1,4 +1,4 @@
-from .checker import CheckerType
+from .checker import Checker, CheckerType
 
 from .call_injection_checker import CallInjectionChecker
 from .airdrop_hunting_checker import AirdropHuntingChecker

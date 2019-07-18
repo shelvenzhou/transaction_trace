@@ -4,7 +4,7 @@ from collections import defaultdict
 from ...datetime_utils import date_to_str, time_to_str
 from ...local import DatabaseName
 from ..intermediate_representations import ResultGraph, ResultType
-from .checker import Checker, CheckerType
+from . import Checker, CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.checkers.ProfitChecker")
 

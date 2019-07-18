@@ -1,7 +1,8 @@
 from collections import defaultdict
 
-from ..intermediate_representations import ResultGraph, ResultType, AttackCandidate
-from .checker import Checker, CheckerType
+from ..intermediate_representations import (AttackCandidate, ResultGraph,
+                                            ResultType)
+from . import Checker, CheckerType
 
 
 class AirdropHuntingChecker(Checker):

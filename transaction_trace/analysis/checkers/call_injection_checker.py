@@ -1,7 +1,7 @@
-from ..intermediate_representations import (
-    ActionTree, ResultGraph, ResultType, extract_address_from_node, AttackCandidate)
+from ..intermediate_representations import (ActionTree, AttackCandidate,
+                                            ResultGraph, ResultType)
 from ..knowledge import SensitiveAPIs, extract_function_signature
-from .checker import Checker, CheckerType
+from . import Checker, CheckerType
 
 
 class CallInjectionChecker(Checker):
@@ -24,8 +24,8 @@ class CallInjectionChecker(Checker):
             return
 
         for e in at.edges():
-            from_address = extract_address_from_node(e[0])
-            to_address = extract_address_from_node(e[1])
+            from_address = ActionTree.extract_address_from_node(e[0])
+            to_address = ActionTree.extract_address_from_node(e[1])
             trace = at.edges[e]
 
             # call-injection only happens when the trace type is "call"

@@ -4,7 +4,7 @@ from collections import defaultdict
 from ...datetime_utils import time_to_str
 from ...local import DatabaseName
 from ..knowledge import SensitiveAPIs
-from .checker import Checker, CheckerType
+from . import Checker, CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.checkers.CallAfterDestructChecker")
 
