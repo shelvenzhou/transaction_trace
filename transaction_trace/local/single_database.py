@@ -2,7 +2,7 @@ import datetime
 import decimal
 import sqlite3
 
-from ..datetime_utils import date_to_str, str_to_date, str_to_time
+from ..basic_utils import DatetimeUtils
 from .database import Database
 from .database_name import DatabaseName
 

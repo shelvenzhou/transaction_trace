@@ -1,15 +1,16 @@
+import logging
+import pickle
+import sqlite3
 from collections import defaultdict
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
-import sqlite3
-import pickle
-from web3 import Web3
 from hashlib import sha256
-import logging
 
-from .local import EthereumDatabase
-from .datetime_utils import time_to_str, month_to_str
+from dateutil.relativedelta import relativedelta
+from web3 import Web3
+
 from .analysis.intermediate_representations import ResultType
+from .basic_utils import DatetimeUtils
+from .local import EthereumDatabase
 
 l = logging.getLogger('eval_util')
 
@@ -670,7 +671,8 @@ class EvalUtil:
                             continue
                         addr = eu.reen_addrs2target[addrs]
                         if addr not in contract_attrs:
-                            contract_attrs[addr] = {'create_time': time_to_str(eu.create_time[addr]), 'attacked_time': set(), 'vul_type': set()}
+                            contract_attrs[addr] = {'create_time': time_to_str(
+                                eu.create_time[addr]), 'attacked_time': set(), 'vul_type': set()}
                         contract_attrs[addr]['attacked_time'].add(time)
                         contract_attrs[addr]['vul_type'].add(name)
                 elif name == 'airdrop-hunting':
@@ -684,7 +686,8 @@ class EvalUtil:
                                 token_address = token
                                 m_amount = amount
                     if token_address not in contract_attrs:
-                        contract_attrs[token_address] = {'create_time': time_to_str(eu.create_time[token_address]), 'attacked_time': set(), 'vul_type': set()}
+                        contract_attrs[token_address] = {'create_time': time_to_str(
+                            eu.create_time[token_address]), 'attacked_time': set(), 'vul_type': set()}
                     contract_attrs[token_address]['attacked_time'].add(time)
                     contract_attrs[token_address]['vul_type'].add(name)
 
@@ -692,9 +695,10 @@ class EvalUtil:
             row = eu.ci_txs[tx_hash]
             c = row['entry']
             if c not in eu.create_time:
-                    continue
+                continue
             if c not in contract_attrs:
-                contract_attrs[c] = {'create_time': time_to_str(eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
+                contract_attrs[c] = {'create_time': time_to_str(
+                    eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
             contract_attrs[c]['vul_type'].add('call-injection')
             contract_attrs[c]['attacked_time'].add(row['time'])
 
@@ -707,14 +711,16 @@ class EvalUtil:
                     if c not in eu.create_time:
                         continue
                     if c not in contract_attrs:
-                        contract_attrs[c] = {'create_time': time_to_str(eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
+                        contract_attrs[c] = {'create_time': time_to_str(
+                            eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
                     contract_attrs[c]['vul_type'].add(mv)
 
         for c in eu.old_overflow:
             if c not in eu.create_time:
                 continue
             if c not in contract_attrs:
-                contract_attrs[c] = {'create_time': time_to_str(eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
+                contract_attrs[c] = {'create_time': time_to_str(
+                    eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
             for row in eu.old_overflow[c]:
                 contract_attrs[c]['attacked_time'].add(row[1])
 
@@ -722,7 +728,8 @@ class EvalUtil:
             if row[1] not in eu.create_time:
                 continue
             if row[1] not in contract_attrs:
-                contract_attrs[row[1]] = {'create_time': time_to_str(eu.create_time[row[1]]), 'attacked_time': set(), 'vul_type': set()}
+                contract_attrs[row[1]] = {'create_time': time_to_str(
+                    eu.create_time[row[1]]), 'attacked_time': set(), 'vul_type': set()}
             contract_attrs[row[1]]['vul_type'].add('honeypot')
 
         for tx_hash in eu.cad_txs:
@@ -731,5 +738,6 @@ class EvalUtil:
                 if c not in eu.create_time:
                     continue
                 if c not in contract_attrs:
-                    contract_attrs[c] = {'create_time': time_to_str(eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
+                    contract_attrs[c] = {'create_time': time_to_str(
+                        eu.create_time[c]), 'attacked_time': set(), 'vul_type': set()}
                 contract_attrs[c]['vul_type'].add('call-after-destruct')

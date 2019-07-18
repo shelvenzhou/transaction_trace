@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from datetime import timedelta, timezone
 
-from ...datetime_utils import str_to_date, time_to_str
+from ...basic_utils import DatetimeUtils
 from ..trace_analysis import TraceAnalysis
 
 l = logging.getLogger("transaction-trace.analysis.Honeypot")
@@ -45,20 +45,20 @@ class Honeypot(TraceAnalysis):
                     return "honeypot %s initialzed with %d wei bonus at %s" % (
                         self.contract_addr,
                         self.bonus,
-                        time_to_str(self.init_time)
+                        DatetimeUtils.time_to_str(self.init_time)
                     )
                 elif self.status == STATUS.PROFITED:
                     return "honeypot %s profited %d wei with %d wei bonus initialized at %s" % (
                         self.contract_addr,
                         self.profit,
                         self.bonus,
-                        time_to_str(self.init_time)
+                        DatetimeUtils.time_to_str(self.init_time)
                     )
                 else:
                     r = "honeypot %s closed with %d wei bonus initialized at %s" % (
                         self.contract_addr,
                         self.bonus,
-                        time_to_str(self.init_time)
+                        DatetimeUtils.time_to_str(self.init_time)
                     )
 
                     if self.profited:
@@ -118,7 +118,7 @@ class Honeypot(TraceAnalysis):
         # use time window of 30min to avoiding taking too much memory
         WINDOW_LENGTH = timedelta(minutes=30)
 
-        window_start = str_to_date(from_time) if isinstance(
+        window_start = DatetimeUtils.str_to_date(from_time) if isinstance(
             from_time, str) else from_time
         window_start = window_start.replace(tzinfo=timezone.utc)
         window_end = window_start + WINDOW_LENGTH
@@ -226,7 +226,7 @@ class Honeypot(TraceAnalysis):
 
         for _, honeypot in tracked_honeypot.items():
             self.record_abnormal_detail(
-                time_to_str(honeypot.create_time),
+                DatetimeUtils.time_to_str(honeypot.create_time),
                 ABNORMAL_TYPE,
                 str(honeypot)
             )

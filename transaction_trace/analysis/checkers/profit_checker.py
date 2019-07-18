@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from ...datetime_utils import date_to_str, time_to_str
+from ...basic_utils import DatetimeUtils
 from ...local import DatabaseName
 from ..intermediate_representations import ResultGraph, ResultType
 from . import Checker, CheckerType
@@ -65,7 +65,7 @@ class ProfitChecker(Checker):
                     traces[tx_hash].append(row)
 
                 for tx_hash in traces:
-                    if not check_time_interval(time, timestamp, date, time_to_str(traces[tx_hash][0]['block_timestamp'])):
+                    if not check_time_interval(time, timestamp, date, DatetimeUtils.time_to_str(traces[tx_hash][0]['block_timestamp'])):
                         continue
                     for trace in traces[tx_hash]:
                         if trace['status'] == 0:
@@ -85,7 +85,7 @@ class ProfitChecker(Checker):
                     token_transfers[tx_hash].append(row)
 
                 for tx_hash in token_transfers:
-                    if not check_time_interval(time, timestamp, date, time_to_str(token_transfers[tx_hash][0]['block_timestamp'])):
+                    if not check_time_interval(time, timestamp, date, DatetimeUtils.time_to_str(token_transfers[tx_hash][0]['block_timestamp'])):
                         continue
                     for token_transfer in token_transfers[tx_hash]:
                         if token_transfer['token_address'] != token_address:
@@ -167,7 +167,7 @@ class ProfitChecker(Checker):
                     profit_account = None if checker == 'integer-overflow' else profit_node
                     for victim in candidates[checker][profit_node][result_type]['victims']:
                         outlay += self.check_contract_income_forward(
-                            victim, profit_account, time_to_str(tx.block_timestamp), result_type)
+                            victim, profit_account, DatetimeUtils.time_to_str(tx.block_timestamp), result_type)
 
                     net_profit = candidates[checker][profit_node][result_type]['amount'] - outlay
                     if net_profit > 0:

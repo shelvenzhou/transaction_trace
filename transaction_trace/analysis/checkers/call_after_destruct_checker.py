@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from ...datetime_utils import time_to_str
+from ...basic_utils import DatetimeUtils
 from ...local import DatabaseName
 from ..knowledge import SensitiveAPIs
 from . import Checker, CheckerType
@@ -29,7 +29,7 @@ class CallAfterDestructChecker(Checker):
                 continue
             for contract in destruct_contracts:
                 destruct_contracts[contract['contract']] = {
-                    'destruct_time': time_to_str(tx['block_timestamp']),
+                    'destruct_time': DatetimeUtils.time_to_str(tx['block_timestamp']),
                     'destruct_tx_hash': tx.tx_hash,
                     'value': contract['value']
                 }
@@ -50,7 +50,7 @@ class CallAfterDestructChecker(Checker):
                     if trace["status"] == 0:
                         continue
                     to_address = trace["to_address"]
-                    if to_address in destruct_contracts and time_to_str(trace["block_timestamp"]) > destruct_contracts[to_address]["destruct_time"]:
+                    if to_address in destruct_contracts and DatetimeUtils.time_to_str(trace["block_timestamp"]) > destruct_contracts[to_address]["destruct_time"]:
                         if SensitiveAPIs.sensitive_function_call(trace["input"]):
                             callee = SensitiveAPIs.func_name(trace["input"])
                             detail = {
@@ -74,7 +74,7 @@ class CallAfterDestructChecker(Checker):
                     l.info("CallAfterDestruct found for tx: %s", tx_hash)
                     tx_detail = {
                         'tx_hash': tx_hash,
-                        'block_timestamp': time_to_str(traces[tx_hash][0]["block_timestamp"]),
+                        'block_timestamp': DatetimeUtils.time_to_str(traces[tx_hash][0]["block_timestamp"]),
                         'cad_details': call_after_destruct
                     }
                     print(tx_detail, file=self.log_file)

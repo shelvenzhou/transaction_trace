@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from ..datetime_utils import date_to_str
+from ..basic_utils import DatetimeUtils
 from .database import Database
 
 
@@ -42,5 +42,5 @@ class ContractTransactions(Database):
                          "WHERE contract=%s", (contract,))
         txs = defaultdict(list)
         for row in rows:
-            txs[date_to_str(row[0])].append(row[1])
+            txs[DatetimeUtils.date_to_str(row[0])].append(row[1])
         return txs

@@ -4,8 +4,7 @@ import sqlite3
 import sys
 from datetime import datetime, timedelta
 
-from transaction_trace.datetime_utils import (date_to_str, str_to_date,
-                                              str_to_time, time_to_str)
+from transaction_trace.basic_utils import DatetimeUtils
 from transaction_trace.local.ethereum_database import db_filename
 from transaction_trace.local.single_database import *
 from transaction_trace.remote.ethereum_bigquery import EthereumBigQuery
@@ -55,17 +54,17 @@ def main(db_folder, db_name, crawl_time_path, time_interval, to_time, from_time)
     if from_time == None:
         try:
             with open(crawl_time_path, "r") as f:
-                from_time = str_to_time(f.readline())
+                from_time = DatetimeUtils.str_to_time(f.readline())
         except:
             print("crawl-time log not found, from_time need to be set")
             exit(-1)
     else:
-        from_time = str_to_date(from_time)
+        from_time = DatetimeUtils.str_to_date(from_time)
     t_time = from_time + timedelta(hours=int(time_interval))
 
-    while from_time <= str_to_date(to_time):
+    while from_time <= DatetimeUtils.str_to_date(to_time):
         date = from_time.date()
-        date_str = date_to_str(date)
+        date_str = DatetimeUtils.date_to_str(date)
         db_filepath = os.path.join(db_folder, db_filename(db_name, date_str))
         db = globals()[database_map[db_name]["class_name"]](
             db_filepath, date_str)
@@ -89,7 +88,7 @@ def main(db_folder, db_name, crawl_time_path, time_interval, to_time, from_time)
             from_time = t_time
             t_time += timedelta(hours=int(time_interval))
             with open(crawl_time_path, "w+") as f:
-                f.write(time_to_str(from_time))
+                f.write(DatetimeUtils.time_to_str(from_time))
 
 
 if __name__ == "__main__":

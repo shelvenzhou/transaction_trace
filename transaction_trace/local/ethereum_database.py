@@ -5,7 +5,7 @@ import re
 
 from sortedcontainers import SortedList
 
-from ..datetime_utils import date_to_str, str_to_date
+from ..basic_utils import DatetimeUtils
 from .database_name import DatabaseName
 from .single_database import SingleDatabaseFactory, SingleTraceDatabase
 
@@ -14,7 +14,7 @@ l = logging.getLogger("transaction-trace.local.ethereum_database")
 
 def data_time_range(db_folder, db_name):
     prog = re.compile(r"%s_(\d{4}\-\d{2}\-\d{2})\.sqlite3" % db_name)
-    dates = SortedList(key=lambda x: str_to_date(x))
+    dates = SortedList(key=lambda x: DatetimeUtils.str_to_date(x))
     for file in os.listdir(db_folder):
         m = prog.match(file)
         if m is not None:
@@ -48,7 +48,7 @@ class EthereumDatabase:
 
     def get_connection(self, date):
         if isinstance(date, datetime.datetime):
-            date = date_to_str(date)
+            date = DatetimeUtils.date_to_str(date)
 
         if date not in self._data_time_range:
             return None
@@ -75,9 +75,9 @@ class EthereumDatabase:
         Time range can be datetime.datetime or string.
         '''
         if isinstance(from_time, datetime.datetime):
-            from_time = date_to_str(from_time)
+            from_time = DatetimeUtils.date_to_str(from_time)
         if isinstance(to_time, datetime.datetime):
-            to_time = date_to_str(to_time)
+            to_time = DatetimeUtils.date_to_str(to_time)
 
         for i in range(self._data_time_range.bisect_left(from_time), self._data_time_range.bisect_right(to_time)):
             date = self._data_time_range[i]
