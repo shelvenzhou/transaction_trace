@@ -1,7 +1,7 @@
 from collections import defaultdict
 
-from ..intermediate_representations import (AttackCandidate, ResultGraph,
-                                            ResultType)
+from ..intermediate_representations import ResultGraph
+from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
 
 
@@ -26,28 +26,30 @@ class AirdropHuntingChecker(Checker):
             if trace['trace_type'] == 'create':
                 slaves.append(e[1])
 
-        huntings = list()
+        intentions = list()
         # search partial-result-graph for each candidate
         for s in slaves:
             prg = ResultGraph.build_partial_result_graph(result_graph.t, s)
 
-            intentions = list()
+            results = list()
             for node in prg.nodes():
                 for result_type in prg.nodes[node]:
                     # in airdrop hunting, we only concern about token transfer
                     if ResultGraph.extract_result_type(result_type) == ResultType.TOKEN_TRANSFER:
                         amount = prg.nodes[node][result_type]
                         if amount > 0:
-                            intentions.append({
+                            results.append({
                                 "profit_node": node,
                                 "result_type": result_type,
                                 "amount": amount,
                             })
 
-            if len(intentions) > 0:
-                huntings.append(intentions)
+            if len(results) > 0:
+                intentions.append(results)
 
-        if len(huntings) > 0:
+        if len(intentions) > 0:
+            tx.is_attack = True
+
             profits = dict()
             for node in rg.nodes():
                 profit = dict()
@@ -59,16 +61,17 @@ class AirdropHuntingChecker(Checker):
                 if len(profit) > 0:
                     profits[node] = profit
 
+            candidate = AttackCandidate(
+                self.name,
+                {
+                    "transaction": tx.tx_hash,
+                    "slave_number": len(slaves),
+                    "hunting_time": len(intentions),
+                },
+                # intentions,
+                profits,
+            )
             if len(profits) > 0:
-                tx.is_attack = True
-                tx.attack_candidates.append(
-                    AttackCandidate(
-                        self.name,
-                        {
-                            "transaction": tx.tx_hash,
-                            "hunting_time": len(huntings),
-                        },
-                        intentions,
-                        profits,
-                    )
-                )
+                tx.attack_candidates.append(candidate)
+            else:
+                tx.failed_attacks.append(candidate)

@@ -16,6 +16,7 @@ class Transaction:
 
         self.is_attack = False
         self.attack_candidates = list()
+        self.failed_attacks = list()
 
         self.destruct_contracts = list()
 

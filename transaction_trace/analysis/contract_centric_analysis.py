@@ -11,8 +11,8 @@ l = logging.getLogger("transaction-trace.analysis.ContractCentricAnalysis")
 
 class ContractCentricAnalysis(TraceAnalysis):
 
-    def __init__(self, db_folder, log_file, idx_db_user="contract_txs_idx", idx_db_passwd="password", idx_db="contract_txs_idx"):
-        super(ContractCentricAnalysis, self).__init__(db_folder, log_file, [
+    def __init__(self, db_folder, idx_db_user="contract_txs_idx", idx_db_passwd="password", idx_db="contract_txs_idx"):
+        super(ContractCentricAnalysis, self).__init__(db_folder, [
             DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
         tx_index_db = ContractTransactions(
             user=idx_db_user, passwd=idx_db_passwd, db=idx_db)

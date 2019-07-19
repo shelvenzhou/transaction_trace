@@ -1,19 +1,18 @@
 import logging
-import sys
 import os
+import sys
 from collections import defaultdict
 
+from ..local import DatabaseName
 from .intermediate_representations import ActionTree, ResultGraph
 from .trace_analysis import TraceAnalysis
-from ..local import DatabaseName
 
 l = logging.getLogger("transaction-trace.analysis.PreProcess")
 
 
 class PreProcess(TraceAnalysis):
-    def __init__(self, db_folder, log_file=sys.stdout):
-        super(PreProcess, self).__init__(db_folder, log_file, [
-            DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
+    def __init__(self, db_folder):
+        super(PreProcess, self).__init__(db_folder, [DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
 
     def preprocess(self):
         for conn in self.database[DatabaseName.TRACE_DATABASE].get_all_connnections():

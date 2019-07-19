@@ -9,7 +9,7 @@ l = logging.getLogger("transaction-trace.analysis.TransactionCentricAnalysis")
 
 class TransactionCentricAnalysis(TraceAnalysis):
 
-    def __init__(self, log_file):
+    def __init__(self):
         super(TransactionCentricAnalysis, self).__init__()
         self.checkers = dict()
 
