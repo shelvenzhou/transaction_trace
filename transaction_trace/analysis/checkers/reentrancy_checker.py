@@ -141,7 +141,7 @@ class ReentrancyChecker(Checker):
 
             if len(profits) > 0:
                 tx.is_attack = True
-                tx.attack_details.append({
+                tx.attack_candidates.append({
                     "checker": self.name,
                     "attacks": attacks,
                     "profit": profits

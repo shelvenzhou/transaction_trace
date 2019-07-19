@@ -4,7 +4,7 @@ import logging
 from eth_abi import decode_abi, decoding
 from eth_abi.registry import BaseEquals, registry
 
-from ..intermediate_representations import ResultType
+from ..results import ResultType
 
 l = logging.getLogger("transaction-trace.analysis.knowledge.SensitiveAPIs")
 

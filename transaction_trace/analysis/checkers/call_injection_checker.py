@@ -122,7 +122,7 @@ class CallInjectionChecker(Checker):
 
             if len(profit) > 0:
                 tx.is_attack = True
-                tx.attack_details.append(
+                tx.attack_candidates.append(
                     AttackCandidate(
                         self.name,
                         {

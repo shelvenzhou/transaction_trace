@@ -31,7 +31,7 @@ class ContractCentricAnalysis(TraceAnalysis):
         for tx in txs:
             if tx.is_attack:
                 l.info("%s | %s %s", DatetimeUtils.time_to_str(tx.block_timestamp), tx.tx_hash, str(
-                    set([attack['checker'] for attack in tx.attack_details])))
+                    set([attack['checker'] for attack in tx.attack_candidates])))
                 self.record_abnormal_detail(tx.to_string())
 
     def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=100000):

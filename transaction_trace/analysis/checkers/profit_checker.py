@@ -155,7 +155,7 @@ class ProfitChecker(Checker):
 
     def check_transaction(self, tx):
         # extract the candidate attack profits
-        candidates = self.extract_profit_candidates(tx.attack_details)
+        candidates = self.extract_profit_candidates(tx.attack_candidates)
 
         attack_net_profit = dict()
         for checker in candidates:
@@ -177,13 +177,13 @@ class ProfitChecker(Checker):
                     attack_net_profit[checker][profit_node] = net_profits
 
         attack_details = list()
-        for checker_result in tx.attack_details:
+        for checker_result in tx.attack_candidates:
             if checker_result['checker'] in attack_net_profit:
                 if len(attack_net_profit[checker_result['checker']]) > 0:
                     checker_result['net_profit'] = attack_net_profit[checker_result['checker']]
                     attack_details.append(checker_result)
             else:
                 attack_details.append(checker_result)
-        tx.attack_details = attack_details
+        tx.attack_candidates = attack_details
         if len(attack_details) == 0:
             tx.is_attack = False

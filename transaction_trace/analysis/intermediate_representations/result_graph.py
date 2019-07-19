@@ -4,8 +4,8 @@ import networkx as nx
 from networkx.algorithms.traversal import dfs_edges
 
 from ..knowledge import SensitiveAPIs
+from ..results import ResultType
 from .action_tree import ActionTree
-from .result_type import ResultType
 from .transaction import Transaction
 
 l = logging.getLogger(

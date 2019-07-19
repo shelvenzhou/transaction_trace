@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from ..intermediate_representations import (AttackCandidate, ResultGraph,
                                             ResultType)
-from . import Checker, CheckerType
+from .checker import Checker, CheckerType
 
 
 class AirdropHuntingChecker(Checker):
@@ -29,23 +29,23 @@ class AirdropHuntingChecker(Checker):
         huntings = list()
         # search partial-result-graph for each candidate
         for s in slaves:
-            prg = ResultGraph.build_partial_result_graph(at, s)
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, s)
 
-            results = list()
+            intentions = list()
             for node in prg.nodes():
                 for result_type in prg.nodes[node]:
                     # in airdrop hunting, we only concern about token transfer
                     if ResultGraph.extract_result_type(result_type) == ResultType.TOKEN_TRANSFER:
                         amount = prg.nodes[node][result_type]
                         if amount > 0:
-                            results.append({
+                            intentions.append({
                                 "profit_node": node,
                                 "result_type": result_type,
                                 "amount": amount,
                             })
 
-            if len(results) > 0:
-                huntings.append(results)
+            if len(intentions) > 0:
+                huntings.append(intentions)
 
         if len(huntings) > 0:
             profits = dict()
@@ -61,13 +61,14 @@ class AirdropHuntingChecker(Checker):
 
             if len(profits) > 0:
                 tx.is_attack = True
-                tx.attack_details.append(
+                tx.attack_candidates.append(
                     AttackCandidate(
                         self.name,
                         {
                             "transaction": tx.tx_hash,
-                            "hunting_time": len(huntings)
+                            "hunting_time": len(huntings),
                         },
+                        intentions,
                         profits,
                     )
                 )
