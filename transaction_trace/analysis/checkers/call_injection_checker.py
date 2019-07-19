@@ -56,8 +56,8 @@ class CallInjectionChecker(Checker):
                     else:
                         encoded_functions = SensitiveAPIs.encoded_functions()
                         for t in encoded_functions:
-                            if callee in encoded_functions[t]:
-                                encoded_callee = encoded_functions[t][callee]
+                            if called_func in encoded_functions[t]:
+                                encoded_callee = encoded_functions[t][called_func]
                                 if encoded_callee in parent_input[10:]:
                                     input_control = True
 
