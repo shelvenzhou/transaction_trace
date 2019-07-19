@@ -33,7 +33,7 @@ def _read_data_from_stream(self, stream):
 
     if len(data) != self.data_byte_size:
         padding_size = self.data_byte_size - len(data)
-        l.warning("try to read %d bytes, only got %d bytes, padding with 0s",
+        l.debug("try to read %d bytes, only got %d bytes, padding with 0s",
                   self.data_byte_size, len(data))
         _data = bytearray()
         if self.is_big_endian:
@@ -61,7 +61,7 @@ class FaultToleranceAddressDecoder(decoding.AddressDecoder):
         padding_size = self.data_byte_size - value_byte_size
 
         if padding_bytes != b'\x00' * padding_size:
-            l.warning("ignore non-zero padding")
+            l.debug("ignore non-zero padding")
 
 
 registry.unregister_decoder('address')
