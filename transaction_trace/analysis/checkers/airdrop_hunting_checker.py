@@ -22,13 +22,12 @@ class AirdropHuntingChecker(Checker):
         slaves = list()
         for e in at.edges():
             trace = at.edges[e]
-            # add the created slave contract to candidates
             if trace['trace_type'] == 'create':
                 slaves.append(e[1])
 
         intentions = list()
-        # search partial-result-graph for each candidate
-        for s in slaves:
+        expected_token_transfers = set()
+        for s in slaves:  # check whether these slaves cause any token transfers
             prg = ResultGraph.build_partial_result_graph(result_graph.t, s)
 
             results = list()
@@ -36,6 +35,7 @@ class AirdropHuntingChecker(Checker):
                 for result_type in prg.nodes[node]:
                     # in airdrop hunting, we only concern about token transfer
                     if ResultGraph.extract_result_type(result_type) == ResultType.TOKEN_TRANSFER:
+                        expected_token_transfers.add(ResultGraph.extract_token_address(result_type))
                         amount = prg.nodes[node][result_type]
                         if amount > 0:
                             results.append({
@@ -45,17 +45,19 @@ class AirdropHuntingChecker(Checker):
                             })
 
             if len(results) > 0:
-                intentions.append(results)
+                intentions.extend(results)
 
         if len(intentions) > 0:
             tx.is_attack = True
 
             profits = dict()
+            real_token_transfers = set()
             for node in rg.nodes():
                 profit = dict()
                 for result_type in rg.nodes[node]:
                     if ResultGraph.extract_result_type(result_type) != ResultType.TOKEN_TRANSFER_EVENT:
                         continue
+                    real_token_transfers.add(ResultGraph.extract_token_address(result_type))
                     if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
                         profit[result_type] = rg.nodes[node][result_type]
                 if len(profit) > 0:
@@ -71,7 +73,7 @@ class AirdropHuntingChecker(Checker):
                 # intentions,
                 profits,
             )
-            if len(profits) > 0:
-                tx.attack_candidates.append(candidate)
-            else:
+            if expected_token_transfers != real_token_transfers or len(action_tree.errs) > 0:
                 tx.failed_attacks.append(candidate)
+            else:
+                tx.attack_candidates.append(candidate)

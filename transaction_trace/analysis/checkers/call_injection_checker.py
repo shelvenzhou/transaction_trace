@@ -1,6 +1,6 @@
-from ..intermediate_representations import (ActionTree, AttackCandidate,
-                                            ResultGraph, ResultType)
+from ..intermediate_representations import ActionTree, ResultGraph
 from ..knowledge import SensitiveAPIs, extract_function_signature
+from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
 
 
@@ -18,11 +18,10 @@ class CallInjectionChecker(Checker):
         at = action_tree.t
         rg = result_graph.g
 
-        candidates = list()
-
         if len(at.edges()) < 2:
             return
 
+        candidates = list()
         for e in at.edges():
             from_address = ActionTree.extract_address_from_node(e[0])
             to_address = ActionTree.extract_address_from_node(e[1])
@@ -41,12 +40,11 @@ class CallInjectionChecker(Checker):
                 # call injection is infeasible for delegatecall
                 if trace['call_type'] == "delegatecall":
                     continue
-
                 if len(at.in_edges(e[0])) == 0:
                     continue
+
                 parent_edge = list(at.in_edges(e[0]))[0]
                 parent_trace = at.edges[parent_edge]
-
                 called_func = extract_function_signature(trace['input'])
                 parent_input = parent_trace['input']
                 # TODO: not consider fallback function in "call" may cause FN, but also reduce FP on same func-name
@@ -64,7 +62,6 @@ class CallInjectionChecker(Checker):
                 if input_control:
                     candidates.append((e, parent_edge))
 
-        # TODO: we've already remove `delegatecall` cases, is this still necessary?
         attacks = list()
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
@@ -73,31 +70,35 @@ class CallInjectionChecker(Checker):
             call_type = at.edges[e]['call_type']
 
             prg = ResultGraph.build_partial_result_graph(result_graph.t, e[0])
-            results = dict()
+            intentions = {
+                "ancestor_profits": dict(),
+                "other_profits": dict(),
+            }
             for e in prg.edges():
-                if e[1] not in ancestors:
-                    continue
-                result = dict()
+                intention = dict()
                 for result_type in prg.edges[e]:
                     rt = ResultGraph.extract_result_type(result_type)
                     if rt == ResultType.OWNER_CHANGE:
-                        result[result_type] = None
+                        intention[result_type] = None
                     elif rt == ResultType.ETHER_TRANSFER:
                         if prg.edges[e][result_type] > self.minimum_profit_amount[rt]:
-                            result[result_type] = prg.edges[e][result_type]
+                            intention[result_type] = prg.edges[e][result_type]
                     elif rt == ResultType.TOKEN_TRANSFER:
                         if prg.edges[e][result_type] > self.minimum_profit_amount[rt]:
-                            result[result_type] = prg.edges[e][result_type]
+                            intention[result_type] = prg.edges[e][result_type]
                     else:
                         continue
-                if len(result) > 0:
-                    results[e] = result
+                if len(intention) > 0:
+                    if e[1] in ancestors:
+                        intentions["ancestor_profits"][str(e)] = intention
+                    else:
+                        intentions["other_profits"][str(e)] = intention
                     sensitive_nodes.add(e[1])
 
-            if len(results) > 0:
+            if len(intentions) > 0:
                 attacks.append({
                     "entry_edge": parent_edge,
-                    'results': results
+                    'intentions': intentions
                 })
 
         if len(attacks) > 0:
@@ -112,23 +113,25 @@ class CallInjectionChecker(Checker):
                     if rt == ResultType.OWNER_CHANGE:
                         profit[result_type] = None
                     elif rt == ResultType.ETHER_TRANSFER:
-                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[rt]:
-                            profit[result_type] = rg.g.nodes[node][result_type]
+                        if rg.nodes[node][result_type] > self.minimum_profit_amount[rt]:
+                            profit[result_type] = rg.nodes[node][result_type]
                     elif rt == ResultType.TOKEN_TRANSFER_EVENT:
-                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
-                            profit[result_type] = rg.g.nodes[node][result_type]
+                        if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
+                            profit[result_type] = rg.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 
-            if len(profit) > 0:
+            candidate = AttackCandidate(
+                self.name,
+                {
+                    "transaction": tx.tx_hash,
+                    "attacks": attacks,
+                },
+                profits,
+            )
+            if len(profits) > 0:
                 tx.is_attack = True
-                tx.attack_candidates.append(
-                    AttackCandidate(
-                        self.name,
-                        {
-                            "transaction": tx.tx_hash,
-                            "attacks": attacks,
-                        },
-                        profits,
-                    )
-                )
+                if len(action_tree.errs) > 0:
+                    tx.failed_attacks.append(candidate)
+                else:
+                    tx.attack_candidates.append(candidate)
