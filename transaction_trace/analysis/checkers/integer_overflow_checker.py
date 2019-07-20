@@ -1,5 +1,6 @@
-from ..intermediate_representations import ResultGraph, ResultType
+from ..intermediate_representations import ResultGraph
 from ..knowledge import SensitiveAPIs
+from ..results import ResultType, AttackCandidate
 from .checker import Checker, CheckerType
 
 
@@ -30,13 +31,14 @@ class IntegerOverflowChecker(Checker):
                 #     candidates.append((e, func_name))
                 candidates.append((e, func_name))
 
-        attacks = list()
+        intentions = list()
         sensitive_nodes = set()
+        expected_token_transfers = set()
         # search partial-result-graph for each candidate
         for (edge, func_name) in candidates:
             prg = ResultGraph.build_partial_result_graph(result_graph.t, edge[0], True)
 
-            results = dict()
+            intention = dict()
             for e in prg.edges():
                 result = dict()
                 for result_type in prg.edges[e]:
@@ -44,37 +46,46 @@ class IntegerOverflowChecker(Checker):
                     if rt != ResultType.TOKEN_TRANSFER:
                         continue
                     if prg.edges[e][result_type] > self.threshold:
+                        expected_token_transfers.add(ResultGraph.extract_token_address(result_type))
                         result[result_type] = prg.edges[e][result_type]
                         sensitive_nodes.add(e[1])
                 if len(result) > 0:
-                    results[e] = result
+                    intention[str(e)] = result
 
-            if len(results) > 0:
-                attacks.append({
+            if len(intention) > 0:
+                intentions.append({
                     'edge': edge,
                     'func_name': func_name,
-                    'results': results
+                    'intention': intention
                 })
 
-        if len(attacks) > 0:
-            rg = result_graph
+        if len(intentions) > 0:
+            tx.is_attack = True
+
             profits = dict()
-            for node in rg.g.nodes():
+            real_token_transfers = set()
+            for node in rg.nodes():
                 if node not in sensitive_nodes:
                     continue
                 profit = dict()
-                for result_type in rg.g.nodes[node]:
+                for result_type in rg.nodes[node]:
                     if ResultGraph.extract_result_type(result_type) != ResultType.TOKEN_TRANSFER_EVENT:
                         continue
-                    if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
-                        profit[result_type] = rg.g.nodes[node][result_type]
+                    real_token_transfers.add(ResultGraph.extract_token_address(result_type))
+                    if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
+                        profit[result_type] = rg.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 
-            if len(profits) > 0:
-                tx.is_attack = True
-                tx.attack_candidates.append({
-                    "checker": self.name,
-                    "attacks": attacks,
-                    "profit": profits
-                })
+            candidate = AttackCandidate(
+                self.name,
+                {
+                    "transaction": tx.tx_hash,
+                    "attacks": intentions,
+                },
+                profits,
+            )
+            if expected_token_transfers != real_token_transfers or len(action_tree.errs) > 0:
+                tx.failed_attacks.append(candidate)
+            else:
+                tx.attack_candidates.append(candidate)
