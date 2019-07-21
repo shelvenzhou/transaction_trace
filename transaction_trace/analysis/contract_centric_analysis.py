@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 
-from ..local import ContractTransactions, DatabaseName
+from ..local import ContractTransactions, ContractTokenTransactions, DatabaseName
 from .trace_analysis import TraceAnalysis
 from .checkers import CheckerType
 from ..datetime_utils import time_to_str
@@ -11,7 +11,7 @@ l = logging.getLogger("transaction-trace.analysis.ContractCentricAnalysis")
 
 class ContractCentricAnalysis(TraceAnalysis):
 
-    def __init__(self, db_folder, log_file, idx_db_user="contract_txs_idx", idx_db_passwd="orzorz", idx_db="contract_txs_idx"):
+    def __init__(self, db_folder, log_file, idx_db_passwd, idx_db_user="contract_txs_idx", idx_db="contract_txs_idx"):
         super(ContractCentricAnalysis, self).__init__(db_folder, log_file, [
             DatabaseName.TRACE_DATABASE, DatabaseName.TOKEN_TRANSFER_DATABASE])
         tx_index_db = ContractTransactions(
@@ -41,6 +41,48 @@ class ContractCentricAnalysis(TraceAnalysis):
                 l.info("%s | %s %s", time_to_str(tx.block_timestamp), tx.tx_hash, str(
                     set([attack['checker'] for attack in tx.attack_details])))
                 self.record_abnormal_detail(tx.to_string())
+
+    def build_contract_token_transactions_index(self, column_index=False, db_cache_len=100000):
+        tx_index_db = ContractTokenTransactions(
+            "", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
+        tx_index_db.create_contract_transactions_table()
+
+        db_cache = list()
+
+        for token_con in self.database[DatabaseName.TOKEN_TRANSFER_DATABASE].get_all_connnections():
+            l.info("construct for %s", token_con)
+
+            token_transfers = defaultdict(list)
+            for row in token_con.read('token_transfers', '*'):
+                tx_hash = row['transaction_hash']
+                token_transfers[tx_hash].append(row)
+
+            for tx_hash in token_transfers:
+                contracts = set()
+
+                for row in token_transfers[tx_hash]:
+                    contracts.add(row['from_address'])
+                    contracts.add(row['to_address'])
+
+                db_cache.append((tx_hash,
+                                 row['block_timestamp'].date(),
+                                 contracts,
+                                 True))
+
+                if len(db_cache) > db_cache_len:
+                    l.info("insert data from cache to database")
+                    for d in db_cache:
+                        tx_index_db.insert_transactions_of_contract(*d)
+
+                    tx_index_db.commit()
+                    db_cache.clear()
+
+        for d in db_cache:
+            tx_index_db.insert_transactions_of_contract(*d)
+        tx_index_db.commit()
+
+        if column_index:
+            tx_index_db.create_contract_index()
 
     def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=100000):
         tx_index_db = self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE]

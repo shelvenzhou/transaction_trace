@@ -12,7 +12,7 @@ from transaction_trace.analysis.checkers import *
 l = logging.getLogger('driver')
 
 
-def main(db_folder, log_path, input_log_file=None):
+def main(db_folder, db_passwd, log_path, input_log_file=None):
     p = PreProcess(db_folder)
 
     with open(os.path.join(log_path, "smart-contract-analyzer-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+") as log_file:
@@ -38,7 +38,7 @@ def main(db_folder, log_path, input_log_file=None):
                     d = eval(line.strip('\n'))
                     candidates.append(Transaction.from_dict(d))
 
-        cca = ContractCentricAnalysis(db_folder, log_file)
+        cca = ContractCentricAnalysis(db_folder, log_file, db_passwd)
         cca.register_contract_centric_checker(ProfitChecker())
         # cca.register_contract_centric_checker(CallAfterDestructChecker(log_file))
 
@@ -48,11 +48,11 @@ def main(db_folder, log_path, input_log_file=None):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print("Usage: python3 %s db_folder log_path [log_file]" %
+    if len(sys.argv) < 4:
+        print("Usage: python3 %s db_folder db_passwd log_path [log_file]" %
               sys.argv[0])
         exit(-1)
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         sys.argv.append(None)
 
-    main(sys.argv[1], sys.argv[2], sys.argv[3])
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
