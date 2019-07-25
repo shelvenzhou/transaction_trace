@@ -65,9 +65,9 @@ class CallInjectionChecker(Checker):
             call_type = action_tree.t.edges[e]['call_type']
 
             # only consider the direct trace result graph when "delegatecall"
-            direct_trace = True if call_type == "delegatecall" else False
+            direct_edge = e if call_type == "delegatecall" else None
             prg = ResultGraph.build_partial_result_graph(
-                result_graph.t, e[0], direct_trace)
+                result_graph.t, e[0], direct_edge)
 
             results = dict()
             for e in prg.edges():

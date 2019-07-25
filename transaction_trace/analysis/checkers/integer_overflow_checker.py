@@ -33,7 +33,7 @@ class IntegerOverflowChecker(Checker):
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
         for (edge, func_name) in candidates:
-            prg = ResultGraph.build_partial_result_graph(result_graph.t, edge[0], True)
+            prg = ResultGraph.build_partial_result_graph(result_graph.t, edge[0], edge)
 
             results = dict()
             for e in prg.edges():

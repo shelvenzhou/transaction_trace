@@ -85,13 +85,10 @@ class ResultGraph:
         return tree
 
     @staticmethod
-    def build_partial_result_graph(result_tree, entry, direct_trace=False):
+    def build_partial_result_graph(result_tree, entry, direct_edge=None):
         graph = nx.DiGraph()
 
-        if direct_trace:
-            edges = result_tree.out_edges(entry)
-        else:
-            edges = dfs_edges(result_tree, entry)
+        edges = direct_edge if direct_edge else dfs_edges(result_tree, entry)
 
         for e in edges:
             for result_type in result_tree.edges[e]:
