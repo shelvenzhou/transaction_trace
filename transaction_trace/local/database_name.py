@@ -8,3 +8,4 @@ class DatabaseName:
     LOG_DATABASE = 'logs'
 
     CONTRACT_TRANSACTIONS_DATABASE = 'contract_transactions'
+    CONTRACT_TOKEN_TRANSACTIONS_DATABASE = 'contract_token_transactions'

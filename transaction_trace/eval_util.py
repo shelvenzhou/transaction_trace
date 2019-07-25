@@ -7,6 +7,7 @@ from web3 import Web3
 from hashlib import sha256
 import logging
 import copy
+import json
 
 from .local import EthereumDatabase
 from .datetime_utils import time_to_str, month_to_str, str_to_time, str_to_date
@@ -97,6 +98,20 @@ PAPERS_RESULT_FILE = '/home/xiangjie/logs/pickles/papers_result'
 CONTRACT_CREATE_TIME = '/home/xiangjie/logs/pickles/contract_create_time'
 
 REENTRANCY_ADDRS_MAP = '/home/xiangjie/logs/pickles/reen_addrs2target'
+
+
+def failed_attack(failed_attack_log_path):
+    f = open(failed_attack_log_path, 'rb')
+    re = json.load(f)
+    target_contracts = defaultdict(set)
+
+    for row in re:
+        if row['type'] == 'integer-overflow':
+            tx_hash = row['details']['transaction']
+            for attack in row['details']['attacks']:
+                target = attack['edge'][1].split(':')[1]
+                target_contracts[target].add(tx_hash)
+    return target_contracts
 
 
 class EvalUtil:
@@ -228,7 +243,7 @@ class EvalUtil:
                         if addrs not in self.reen_addrs2target:
                             continue
                         address = self.reen_addrs2target[addrs]
-                    if str_to_time(self.txs[tx_hash]['block_timestamp']) <= self.create_time[address].replace(tzinfo=None) + time_gap:
+                    if str_to_time(self.txs[tx_hash]['block_timestamp']) > self.create_time[address].replace(tzinfo=None) + time_gap:
                         continue
                     eth_loss = 0
                     for node in checker['profit']:
@@ -247,7 +262,7 @@ class EvalUtil:
                             if amount > m_amount:
                                 token_address = token
                                 m_amount = amount
-                    if str_to_time(self.txs[tx_hash]['block_timestamp']) <= self.create_time[address].replace(tzinfo=None) + time_gap:
+                    if str_to_time(self.txs[tx_hash]['block_timestamp']) > self.create_time[address].replace(tzinfo=None) + time_gap:
                         continue
                     if token_address in token_valuable:
                         airdrop_token_loss[token_address] += amount
@@ -406,8 +421,8 @@ class EvalUtil:
                         node = attack['edge'][1]
                         address = node.split(":")[1]
                         vul2contrs[name].add(address)
-                        if address in self.open_sourced_contract:
-                            vul2contrs_open_sourced[name].add(address)
+                        # if address in self.open_sourced_contract:
+                        #     vul2contrs_open_sourced[name].add(address)
                         if address not in contr2txs[name]:
                             contr2txs[name][address] = set()
                         contr2txs[name][address].add(tx_hash)
@@ -417,8 +432,8 @@ class EvalUtil:
                         node = attack['edge'][1]
                         address = node.split(":")[1]
                         vul2contrs[name].add(address)
-                        if address in self.open_sourced_contract:
-                            vul2contrs_open_sourced[name].add(address)
+                        # if address in self.open_sourced_contract:
+                        #     vul2contrs_open_sourced[name].add(address)
                         if address not in contr2txs[name]:
                             contr2txs[name][address] = set()
                         contr2txs[name][address].add(tx_hash)
@@ -432,9 +447,9 @@ class EvalUtil:
                             continue
                         address = self.reen_addrs2target[addrs]
                         vul2contrs[name].add(address)
-                        if address in self.open_sourced_contract:
-                            vul2contrs_open_sourced[name].add(address)
-                        if addrs not in contr2txs[name]:
+                        # if address in self.open_sourced_contract:
+                        #     vul2contrs_open_sourced[name].add(address)
+                        if address not in contr2txs[name]:
                             contr2txs[name][address] = set()
                         contr2txs[name][address].add(tx_hash)
                 elif name == 'airdrop-hunting':
@@ -449,17 +464,17 @@ class EvalUtil:
                                 token_address = token
                                 m_amount = amount
                     vul2contrs[name].add(token_address)
-                    if token_address in self.open_sourced_contract:
-                        vul2contrs_open_sourced[name].add(token_address)
+                    # if token_address in self.open_sourced_contract:
+                    #     vul2contrs_open_sourced[name].add(token_address)
                     if token_address not in contr2txs[name]:
                         contr2txs[name][token_address] = set()
                     contr2txs[name][token_address].add(tx_hash)
 
         for row in self.honeypot:
             vul2contrs['honeypot'].add(row[1])
-        for c in vul2contrs['honeypot']:
-            if c in self.open_sourced_contract:
-                vul2contrs_open_sourced['honeypot'].add(c)
+        # for c in vul2contrs['honeypot']:
+        #     if c in self.open_sourced_contract:
+        #         vul2contrs_open_sourced['honeypot'].add(c)
 
         if self.cad_txs != None:
             vul2txs['call-after-destruct'].clear()
@@ -470,8 +485,8 @@ class EvalUtil:
                 vul2txs['call-after-destruct'].add(tx_hash)
                 for d in self.cad_txs[tx_hash]['detail']:
                     vul2contrs['call-after-destruct'].add(d['contract'])
-                    if d['contract'] in self.open_sourced_contract:
-                        vul2contrs_open_sourced['call-after-destruct'].add(d['contract'])
+                    # if d['contract'] in self.open_sourced_contract:
+                    #     vul2contrs_open_sourced['call-after-destruct'].add(d['contract'])
                     if d['contract'] not in contr2txs['call-after-destruct']:
                         contr2txs['call-after-destruct'][d['contract']] = set()
                     contr2txs['call-after-destruct'][d['contract']].add(tx_hash)
@@ -499,13 +514,13 @@ class EvalUtil:
         contr2txs = defaultdict(set)
         for c in flow:
             contrs.add(c)
-            if c in self.open_sourced_contract:
-                contrs_open_sourced.add(c)
+            # if c in self.open_sourced_contract:
+            #     contrs_open_sourced.add(c)
             for row in flow[c]:
                 txs.add(row[0])
                 contr2txs[c].add(row[0])
         self.vul2contrs['integer-overflow'] = contrs
-        self.vul2contrs_open_sourced['integer-overflow'] = contrs_open_sourced = set()
+        # self.vul2contrs_open_sourced['integer-overflow'] = contrs_open_sourced
         self.vul2txs['integer-overflow'] = txs
         self.contr2txs['integer-overflow'] = contr2txs
 
@@ -515,16 +530,16 @@ class EvalUtil:
 
         for p in self.papers_result:
             paper_inter_ours[p] = defaultdict(set)
-            paper_resid_ours_open_sourced[p] = defaultdict(set)
+            # paper_resid_ours_open_sourced[p] = defaultdict(set)
             for v in self.papers_result[p]:
                 if v in define_map[p]:
                     mp = define_map[p][v]
                     for c in self.papers_result[p][v]:
                         if c in vul2contrs[mp]:
                             paper_inter_ours[p][mp].add(c)
-                        else:
-                            if c in self.open_sourced_contract:
-                                paper_resid_ours_open_sourced[p][v].add(c)
+                        # else:
+                        #     if c in self.open_sourced_contract:
+                        #         paper_resid_ours_open_sourced[p].add(c)
         return {'paper_inter_ours': paper_inter_ours, 'paper_resid_ours_open_sourced': paper_resid_ours_open_sourced}
 
     def papers_cmp_ours_wo_vul(self, vul2contrs):

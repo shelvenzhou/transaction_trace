@@ -18,6 +18,10 @@ class ContractCentricAnalysis(TraceAnalysis):
             "", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
         self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE] = tx_index_db
 
+        tx_index_db = ContractTokenTransactions(
+            "", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
+        self.database[DatabaseName.CONTRACT_TOKEN_TRANSACTIONS_DATABASE] = tx_index_db
+
         self.checkers = dict()
 
     def register_contract_centric_checker(self, checker):
@@ -43,8 +47,7 @@ class ContractCentricAnalysis(TraceAnalysis):
                 self.record_abnormal_detail(tx.to_string())
 
     def build_contract_token_transactions_index(self, column_index=False, db_cache_len=100000):
-        tx_index_db = ContractTokenTransactions(
-            "", user=idx_db_user, passwd=idx_db_passwd, db=idx_db)
+        tx_index_db = self.database[DatabaseName.CONTRACT_TOKEN_TRANSACTIONS_DATABASE]
         tx_index_db.create_contract_transactions_table()
 
         db_cache = list()

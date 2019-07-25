@@ -19,9 +19,9 @@ def main(db_folder, db_passwd, log_path, input_log_file=None):
         candidates = list()
         if input_log_file == None:
             tca = TransactionCentricAnalysis(log_file)
-            # tca.register_transaction_centric_checker(CallInjectionChecker())
-            # tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
-            # tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
+            tca.register_transaction_centric_checker(CallInjectionChecker())
+            tca.register_transaction_centric_checker(AirdropHuntingChecker(5))
+            tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
             tca.register_transaction_centric_checker(ReentrancyChecker(1))
             # tca.register_transaction_centric_checker(DestructContractChecker())
 

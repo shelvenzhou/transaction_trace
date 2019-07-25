@@ -1,12 +1,17 @@
 from .checker import Checker, CheckerType
 from ..intermediate_representations import ResultType, ResultGraph
+from ..knowledge import SensitiveAPIs
 from ...local import DatabaseName
 from ...datetime_utils import date_to_str, time_to_str
 
 from collections import defaultdict
 import logging
+import pickle
 
 l = logging.getLogger("transaction-trace.analysis.checkers.ProfitChecker")
+
+
+CONTRACT_CREATOR_PICKLE_PATH = "/home/xiangjie/logs/pickles/contract_creator"
 
 
 def check_time_interval(begin_time, end_time, date, time):
@@ -26,6 +31,8 @@ class ProfitChecker(Checker):
         super(ProfitChecker, self).__init__("profit-checker")
         self.income_cache = defaultdict(dict)
         self.database = None
+        with open(CONTRACT_CREATOR_PICKLE_PATH, 'rb') as f:
+            self.contract_creator = pickle.load(f)
 
     @property
     def checker_type(self):
@@ -35,6 +42,9 @@ class ProfitChecker(Checker):
         rt = ResultGraph.extract_result_type(income_type)
         if rt == ResultType.TOKEN_TRANSFER_EVENT:
             token_address = ResultGraph.extract_token_address(income_type)
+            db_name = DatabaseName.CONTRACT_TOKEN_TRANSACTIONS_DATABASE
+        else:
+            db_name = DatabaseName.CONTRACT_TRANSACTIONS_DATABASE
         income = 0
         time = '2015-08-07 00:00:00'
         if contract in self.income_cache and account in self.income_cache[contract] and income_type in self.income_cache[contract][account]:
@@ -47,10 +57,8 @@ class ProfitChecker(Checker):
             l.info("income_cache matched: %s %s %s %s",
                    contract, account, time, income_type)
 
-        txs = self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE].read_transactions_of_contract(
-            contract)
+        txs = self.database[db_name].read_transactions_of_contract(contract)
         l.info("%d dates for %s", len(txs), contract)
-        import IPython;IPython.embed()
         for date in txs:
             if date > timestamp[:10] or date < time[:10]:
                 continue
@@ -67,7 +75,8 @@ class ProfitChecker(Checker):
 
                 for tx_hash in txs[date]:
                     if tx_hash not in traces:
-                        import IPython;IPython.embed()
+                        import IPython
+                        IPython.embed()
                     if not check_time_interval(time, timestamp, date, time_to_str(traces[tx_hash][0]['block_timestamp'])):
                         continue
                     for trace in traces[tx_hash]:
@@ -98,7 +107,6 @@ class ProfitChecker(Checker):
                         src = token_transfer['from_address']
                         dst = token_transfer['to_address']
                         amount = int(token_transfer['value'])
-                        import IPython;IPython.embed()
                         if src == contract:
                             if account == None or account == dst:
                                 income -= amount
@@ -112,10 +120,10 @@ class ProfitChecker(Checker):
 
         return income
 
-    def extract_profit_candidates(self, attack_details):
+    def extract_profit_candidates(self, tx):
         # extract candidate attack profits for call-injection & reentrancy from raw result
         candidates = dict()
-        for checker_result in attack_details:
+        for checker_result in tx.attack_details:
             # if checker_result['checker'] not in ('reentrancy', 'call-injection', 'integer-overflow'):
             if checker_result['checker'] not in ('integer-overflow'):
                 continue
@@ -129,6 +137,9 @@ class ProfitChecker(Checker):
                     }
 
             for attack in checker_result['attacks']:
+                # filter mint related calls for integer-overflow temporarily
+                if checker_result['checker'] == 'integer-overflow' and attack['func_name'] not in SensitiveAPIs._integer_overflow_sensitive_functions:
+                    continue
                 for e in attack['results']:
                     profit_node = e[1]
                     victim_node = e[0]
@@ -143,6 +154,8 @@ class ProfitChecker(Checker):
                         elif rt == ResultType.TOKEN_TRANSFER:
                             token_address = ResultGraph.extract_token_address(
                                 result_type)
+                            if token_address in self.contract_creator and self.contract_creator[token_address] == tx.caller:
+                                continue
                             ert = f"{ResultType.TOKEN_TRANSFER_EVENT}:{token_address}"
                             if ert in checker_result['profit'][profit_node]:
                                 candidate_profits[profit_node][ert]['victims'].add(
@@ -162,7 +175,7 @@ class ProfitChecker(Checker):
 
     def check_transaction(self, tx):
         # extract the candidate attack profits
-        candidates = self.extract_profit_candidates(tx.attack_details)
+        candidates = self.extract_profit_candidates(tx)
 
         attack_net_profit = dict()
         for checker in candidates:
@@ -172,10 +185,12 @@ class ProfitChecker(Checker):
                 for result_type in candidates[checker][profit_node]:
                     outlay = 0
                     profit_account = None if checker == 'integer-overflow' else profit_node
-                    for victim in candidates[checker][profit_node][result_type]['victims']:
+                    victims = candidates[checker][profit_node][result_type]['victims']
+                    if len(victims) == 0:
+                        continue
+                    for victim in victims:
                         outlay += self.check_contract_income_forward(
                             victim, profit_account, time_to_str(tx.block_timestamp), result_type)
-                    import IPython;IPython.embed()
                     net_profit = candidates[checker][profit_node][result_type]['amount'] - outlay
                     if net_profit > self.minimum_profit_amount[ResultGraph.extract_result_type(result_type)]:
                         net_profits[result_type] = net_profit
