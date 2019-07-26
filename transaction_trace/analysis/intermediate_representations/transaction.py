@@ -18,7 +18,5 @@ class Transaction:
         self.attack_candidates = list()
         self.failed_attacks = list()
 
-        self.destruct_contracts = list()
-
     def __repr__(self):
         return "meta-data of transaction %s" % self.tx_hash

@@ -15,6 +15,10 @@ class Checker:
 
     def __init__(self, checker_name):
         self.checker_name = checker_name
+        self.database = None
+
+    def set_database(self, db):
+        self.database = db
 
     @property
     def name(self):
@@ -24,6 +28,7 @@ class Checker:
     def minimum_profit_amount(self):
         return {
             ResultType.ETHER_TRANSFER: Web3.toWei(0.00001, 'ether'),
+            ResultType.TOKEN_TRANSFER_EVENT: 100,
             ResultType.TOKEN_TRANSFER: 100
         }
 

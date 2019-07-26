@@ -14,8 +14,7 @@ def patched_zip(dst, amount):
         for _dst in dst:
             yield _dst, amount
     else:
-        for _dst, _amount in zip(dst, amount):
-            yield _dst, _amount
+        yield from zip(dst, amount)
 
 
 def extract_function_signature(input_data):
@@ -90,6 +89,8 @@ def _extract_function_parameters(func_name, input_data):
 class SensitiveAPIs:
 
     _integer_overflow_sensitive_functions = {
+        'transfer(address,uint256)',
+        'transferFrom(address,address,uint256)',
         'transferMulti(address[],uint256[])',
         'transferProxy(address,address,uint256,uint256,uint8,bytes32,bytes32)',
         'batchTransfer(address[],uint256)',

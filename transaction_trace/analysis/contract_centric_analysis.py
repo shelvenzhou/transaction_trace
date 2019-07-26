@@ -22,17 +22,12 @@ class ContractCentricAnalysis(TraceAnalysis):
 
     def register_contract_centric_checker(self, checker):
         assert checker.checker_type == CheckerType.CONTRACT_CENTRIC, "try to register a checker of wrong type"
+        checker.set_database(self.database)
         self.checkers[checker.name] = checker
 
-    def do_analysis(self, txs):
-        for checker_name, checker in self.checkers.items():
-            checker.do_check(txs, self.database)
-
-        for tx in txs:
-            if tx.is_attack:
-                l.info("%s | %s %s", DatetimeUtils.time_to_str(tx.block_timestamp), tx.tx_hash, str(
-                    set([attack['checker'] for attack in tx.attack_candidates])))
-                self.record_abnormal_detail(tx.to_string())
+    def do_analysis(self, **kwargs):
+        for _, checker in self.checkers.items():
+            checker.do_check(**kwargs)
 
     def build_contract_transactions_index(self, pre_process, column_index=False, db_cache_len=100000):
         tx_index_db = self.database[DatabaseName.CONTRACT_TRANSACTIONS_DATABASE]
