@@ -81,14 +81,7 @@ class ActionTree:
                 to_node = ActionTree.encode_node(trace_id, trace['to_address'])
 
             if trace['status'] == 0:
-                errs.append({
-                    'from_address': trace['from_address'],
-                    'to_address': trace['to_address'],
-                    'trace_type': trace['trace_type'],
-                    'call_type': trace['call_type'],
-                    'input': trace['input'],
-                    'error': trace['error'],
-                })
+                errs.append(dict(trace))
 
             tree.add_edge(from_node, to_node, **dict(trace))
 

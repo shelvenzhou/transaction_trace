@@ -66,7 +66,6 @@ class ResultGraph:
             trace = action_tree.t.edges[e]
 
             if trace['status'] == 0:  # error trace will not cause any results
-                # TODO: check the intention of the failed traces
                 continue
 
             if trace['value'] > 0:  # check ether transfer
