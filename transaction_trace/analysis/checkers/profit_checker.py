@@ -3,7 +3,8 @@ from collections import defaultdict
 
 from ...basic_utils import DatetimeUtils
 from ...local import DatabaseName
-from ..intermediate_representations import ResultGraph, ResultType
+from ..intermediate_representations import ResultGraph
+from ..results import ResultType
 from .checker import Checker, CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.checkers.ProfitChecker")

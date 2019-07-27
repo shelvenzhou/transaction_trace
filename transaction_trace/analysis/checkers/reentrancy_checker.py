@@ -2,7 +2,8 @@ from collections import defaultdict
 
 import networkx as nx
 
-from ..intermediate_representations import ActionTree, ResultGraph, ResultType
+from ..intermediate_representations import ActionTree, ResultGraph
+from ..results import ResultType
 from .checker import Checker, CheckerType
 
 
@@ -122,20 +123,20 @@ class ReentrancyChecker(Checker):
             # compute whole transaction economic lost
             rg = result_graph
             profits = dict()
-            for node in rg.g.nodes():
+            for node in rg.nodes():
                 if node not in sensitive_nodes:
                     continue
                 profit = dict()
-                for result_type in rg.g.nodes[node]:
+                for result_type in rg.nodes[node]:
                     rt = ResultGraph.extract_result_type(result_type)
                     if rt == ResultType.OWNER_CHANGE:
                         continue
                     elif rt == ResultType.ETHER_TRANSFER:
-                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[result_type]:
-                            profit[result_type] = rg.g.nodes[node][result_type]
+                        if rg.nodes[node][result_type] > self.minimum_profit_amount[result_type]:
+                            profit[result_type] = rg.nodes[node][result_type]
                     elif rt == ResultType.TOKEN_TRANSFER_EVENT:
-                        if rg.g.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
-                            profit[result_type] = rg.g.nodes[node][result_type]
+                        if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
+                            profit[result_type] = rg.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 
