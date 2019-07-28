@@ -36,6 +36,12 @@ class AttackCandidate:
         # self.intentions = intentions
         self.results = results
 
+    def add_failed_reason(self, reason):
+        if "failed_reason" not in self.details:
+            self.details["failed_reason"] = list()
+
+        self.details["failed_reason"].append(reason)
+
 
 class AttackCandidateExporter:
 

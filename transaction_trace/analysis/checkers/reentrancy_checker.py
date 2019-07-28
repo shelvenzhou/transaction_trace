@@ -3,7 +3,7 @@ from collections import defaultdict
 import networkx as nx
 
 from ..intermediate_representations import ActionTree, ResultGraph
-from ..results import ResultType
+from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
 
 
@@ -17,7 +17,7 @@ class ReentrancyChecker(Checker):
     def checker_type(self):
         return CheckerType.TRANSACTION_CENTRIC
 
-    def count_cycle_turns(self, graph, cycle):
+    def count_iter_num(self, graph, cycle):
         edges = ActionTree.get_edges_from_cycle(cycle)
         walk = {'max_height': 0, 'trace_id': 0, 'edge': ()}
         call_traces = dict()
@@ -84,17 +84,17 @@ class ReentrancyChecker(Checker):
         for cycle in cycles:
             if len(cycle) < 2:
                 continue
-            entry, turns_count = self.count_cycle_turns(g, cycle)
-            if turns_count > self.threshold:
-                candidates.append((entry, cycle, turns_count))
+            entry, iter_num = self.count_iter_num(g, cycle)
+            if iter_num > self.threshold:
+                candidates.append((entry, cycle, iter_num))
 
-        attacks = list()
+        intentions = list()
         sensitive_nodes = set()
         # search partial-result-graph for each candidate
-        for (entry, cycle, turns_count) in candidates:
+        for (entry, cycle, iter_num) in candidates:
             prg = ResultGraph.build_partial_result_graph(result_graph.t, entry)
 
-            results = dict()
+            intention = dict()
             for e in prg.edges():
                 result = dict()
                 for result_type in prg.edges[e]:
@@ -108,20 +108,21 @@ class ReentrancyChecker(Checker):
                         if prg.edges[e][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
                             result[result_type] = prg.edges[e][result_type]
                 if len(result) > 0:
-                    results[e] = result
+                    intention[str(e)] = result
                     sensitive_nodes.add(e[1])
 
-            if len(results) > 0:
-                attacks.append({
+            if len(intention) > 0:
+                intentions.append({
                     "entry": entry,
                     "cycle": cycle,
-                    "turns_count": turns_count,
-                    "results": results
+                    "iter_num": iter_num,
+                    "intention": intention
                 })
 
-        if len(attacks) > 0:
+        if len(intentions) > 0:
+            tx.is_attack = True
+
             # compute whole transaction economic lost
-            rg = result_graph
             profits = dict()
             for node in rg.nodes():
                 if node not in sensitive_nodes:
@@ -135,15 +136,21 @@ class ReentrancyChecker(Checker):
                         if rg.nodes[node][result_type] > self.minimum_profit_amount[result_type]:
                             profit[result_type] = rg.nodes[node][result_type]
                     elif rt == ResultType.TOKEN_TRANSFER_EVENT:
-                        if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
+                        if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER_EVENT]:
                             profit[result_type] = rg.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 
-            if len(profits) > 0:
-                tx.is_attack = True
-                tx.attack_candidates.append({
-                    "checker": self.name,
-                    "attacks": attacks,
-                    "profit": profits
-                })
+            candidate = AttackCandidate(
+                self.name,
+                {
+                    "transaction": tx.tx_hash,
+                    "attacks": intentions,
+                },
+                profits,
+            )
+            if len(action_tree.errs) > 0:
+                candidate.add_failed_reason("reverted trace in tx")
+                tx.failed_attacks.append(candidate)
+            else:
+                tx.attack_candidates.append(candidate)

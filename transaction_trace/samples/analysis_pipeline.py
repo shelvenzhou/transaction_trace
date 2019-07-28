@@ -23,13 +23,11 @@ def main(db_folder, log_path):
     candidate_file = AttackCandidateExporter(attack_candidates)
     failure_file = AttackCandidateExporter(failed_attacks)
 
-    # candidates = list()
-
     tca = TransactionCentricAnalysis()
     tca.register_transaction_centric_checker(CallInjectionChecker())
     tca.register_transaction_centric_checker(AirdropHuntingChecker())
     tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
-    # tca.register_transaction_centric_checker(ReentrancyChecker(5))
+    tca.register_transaction_centric_checker(ReentrancyChecker(5))
 
     for call_tree, result_graph in p.preprocess():
         if call_tree == None:

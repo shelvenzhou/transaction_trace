@@ -74,6 +74,10 @@ class AirdropHuntingChecker(Checker):
                 profits,
             )
             if expected_token_transfers != real_token_transfers or len(action_tree.errs) > 0:
+                if expected_token_transfers != real_token_transfers:
+                    candidate.add_failed_reason("unrealized token transfer")
+                if len(action_tree.errs) > 0:
+                    candidate.add_failed_reason("reverted trace in tx")
                 tx.failed_attacks.append(candidate)
             else:
                 tx.attack_candidates.append(candidate)

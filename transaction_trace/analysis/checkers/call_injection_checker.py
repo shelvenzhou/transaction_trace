@@ -102,6 +102,8 @@ class CallInjectionChecker(Checker):
                 })
 
         if len(attacks) > 0:
+            tx.is_attack = True
+
             # compute whole transaction economic lost
             profits = dict()
             for node in rg.nodes():
@@ -129,9 +131,8 @@ class CallInjectionChecker(Checker):
                 },
                 profits,
             )
-            if len(profits) > 0:
-                tx.is_attack = True
-                if len(action_tree.errs) > 0:
-                    tx.failed_attacks.append(candidate)
-                else:
-                    tx.attack_candidates.append(candidate)
+            if len(action_tree.errs) > 0:
+                candidate.add_failed_reason("reverted trace in tx")
+                tx.failed_attacks.append(candidate)
+            else:
+                tx.attack_candidates.append(candidate)
