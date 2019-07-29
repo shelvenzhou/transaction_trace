@@ -14,11 +14,12 @@ from transaction_trace.analysis.results import AttackCandidateExporter
 l = logging.getLogger('analysis_pipeline')
 
 
-def main(db_folder, log_path):
+def main(db_folder, mysql_password, log_path):
 
     p = PreProcess(db_folder)
 
-    attack_candidates = open(os.path.join(log_path, "attack-candidates-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+")
+    attack_candidates = open(os.path.join(log_path, "attack-candidates-%s.log" %
+                                          str(time.strftime('%Y%m%d%H%M%S'))), "w+")
     failed_attacks = open(os.path.join(log_path, "failed-attacks-%s.log" % str(time.strftime('%Y%m%d%H%M%S'))), "w+")
     candidate_file = AttackCandidateExporter(attack_candidates)
     failure_file = AttackCandidateExporter(failed_attacks)
@@ -28,9 +29,12 @@ def main(db_folder, log_path):
     tca.register_transaction_centric_checker(AirdropHuntingChecker())
     tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
     tca.register_transaction_centric_checker(ReentrancyChecker(5))
+    # tca.register_transaction_centric_checker(HoneypotChecker())
+    tca.register_transaction_centric_checker(CallAfterDestructChecker())
+    tca.register_transaction_centric_checker(TODChecker(mysql_password))
 
     for call_tree, result_graph in p.preprocess():
-        if call_tree == None:
+        if call_tree is None:
             continue
         tca.do_analysis(call_tree, result_graph)
         if call_tree.tx.is_attack:
@@ -39,19 +43,10 @@ def main(db_folder, log_path):
             for failure in call_tree.tx.failed_attacks:
                 failure_file.dump_candidate(failure)
 
-        # if len(call_tree.tx.destruct_contracts) > 0:
-        #     pass
-
-    # cca = ContractCentricAnalysis(db_folder)
-    # cca.register_contract_centric_checker(ProfitChecker())
-    # cca.register_contract_centric_checker(CallAfterDestructChecker(log_file))
-
-    # cca.do_analysis(candidates)
-
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print("Usage: python3 %s db_folder log_path" % sys.argv[0])
+    if len(sys.argv) != 4:
+        print("Usage: python3 %s db_folder mysql_password log_path" % sys.argv[0])
         exit(-1)
 
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3])

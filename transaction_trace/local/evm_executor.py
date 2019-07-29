@@ -3,41 +3,54 @@ import re
 import subprocess
 import sys
 
-load_re = re.compile("storage load:\[([^:]*): ([^\]]*)\]")
-store_re = re.compile("storage store:\[([^:]*): ([^\]]*)\]")
-
-
-class StorageAccessLog:
-
-    def __init__(self):
-        self.loads = set()
-        self.stores = set()
+access_re = re.compile("storage ([^:]*):\[([^:]*): ([^\]]*)\]")
 
 
 class EVMExecutor:
 
-    def __init__(self):
+    def __init__(self, cache_len=100000):
         self.evm = "evm_{}".format(sys.platform)
 
         current_dir = os.path.dirname(os.path.realpath(__file__))
         self.evm_filepath = os.path.join(current_dir + "/../res/bin", self.evm)
 
-    def log_storage_accesses(self, contract_code, input_data):
+        self._storage_access_cache = dict()
+        self._access_history = list()
+        self._cache_len = cache_len
+
+    def deployed_code(self, creation_code):
         result = subprocess.run([self.evm_filepath,
                                  "--create",
-                                 "--code", contract_code,
+                                 "--code", creation_code.replace("0x", ""),
                                  "run"], stdout=subprocess.PIPE)
-        real_code = result.stdout.decode("utf-8").split("\n")[-2]
+        return result.stdout.decode("utf-8").split("\n")[-2]
+
+    def log_storage_accesses(self, deployed_code, input_data):
+        if deployed_code is None:
+            return set()
+
+        code = deployed_code.replace("0x", "")
+        i = input_data.replace("0x", "")
+
+        if (code, i) in self._access_history:
+            self._access_history.remove((code, i))
+            self._access_history.append((code, i))
+            return self._storage_access_cache[(code, i)]
+        if len(self._access_history) == self._cache_len:
+            lru = self._access_history.pop(0)
+            self._storage_access_cache.pop(lru)
 
         result = subprocess.run([self.evm_filepath,
-                                 "--code", real_code,
-                                 "--input", input_data,
+                                 "--code", code,
+                                 "--input", i,
                                  "run"], stdout=subprocess.PIPE)
         output = result.stdout.decode("utf-8")
 
-        access_log = StorageAccessLog()
-        for loc, val in load_re.findall(output):
-            access_log.loads.add(loc)
-        for loc, val in store_re.findall(output):
-            access_log.stores.add(loc)
+        access_log = list()
+        for op, loc, val in access_re.findall(output):
+            access_log.append((op, int(loc, 16)))
+
+        self._access_history.append((code, i))
+        self._storage_access_cache[(code, i)] = access_log
+
         return access_log

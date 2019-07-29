@@ -37,8 +37,8 @@ class Database:
 
     def read(self, table, columns, conditions="", args=dict()):
         cur = self._conn.cursor()
-        re = cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)
-        return re if self.inner_db == 'sqlite3' else cur.fetchall()
+        cur.execute(f"SELECT {columns} FROM {table} {conditions}", args)
+        return cur
 
     def insert(self, table, columns, placeholders, row):
         cur = self._conn.cursor()

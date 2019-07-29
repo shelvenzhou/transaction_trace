@@ -54,16 +54,13 @@ class ContractCode(Database):
         cur = self._conn.cursor()
         cur.execute("CREATE FULLTEXT INDEX `source_code_index` ON `source_code`(`source_code`);")
 
-    def search_keyword_in_source(self, keyword, columns="address", case_sensitive=True):
-        if case_sensitive:
-            condition = "WHERE source_code LIKE \"%%%s%%\""
-        else:
-            keyword = keyword.lower()
-            condition = "WHERE LOWER(source_code) LIKE \"%%%s%%\""
+    def read_bytecode(self, contract):
+        return self.read("byte_code", "bytecode", "WHERE address = %s", (contract,))
 
+    def search_keyword_in_source(self, keyword, columns="address"):
         return self.read(
             "byte_code INNER JOIN source_code ON byte_code.bytecode_hash = source_code.bytecode_hash",
             columns,
-            condition,
+            "WHERE source_code LIKE \"%%%s%%\"",
             (keyword,)
         )
