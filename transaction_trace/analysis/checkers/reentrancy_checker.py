@@ -108,7 +108,7 @@ class ReentrancyChecker(Checker):
                         if prg.edges[e][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER]:
                             result[result_type] = prg.edges[e][result_type]
                 if len(result) > 0:
-                    intention[str(e)] = result
+                    intention[e] = result
                     sensitive_nodes.add(e[1])
 
             if len(intention) > 0:

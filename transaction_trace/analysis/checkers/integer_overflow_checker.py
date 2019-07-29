@@ -59,7 +59,7 @@ class IntegerOverflowChecker(Checker):
                         result[result_type] = prg.edges[e][result_type]
                         sensitive_nodes.add(e[1])
                 if len(result) > 0:
-                    intention[str(e)] = result
+                    intention[e] = result
 
             if len(intention) > 0:
                 intentions.append({

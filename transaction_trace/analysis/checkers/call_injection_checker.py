@@ -90,9 +90,9 @@ class CallInjectionChecker(Checker):
                         continue
                 if len(intention) > 0:
                     if e[1] in ancestors:
-                        intentions["ancestor_profits"][str(e)] = intention
+                        intentions["ancestor_profits"][e] = intention
                     else:
-                        intentions["other_profits"][str(e)] = intention
+                        intentions["other_profits"][e] = intention
                     sensitive_nodes.add(e[1])
 
             if len(intentions) > 0:

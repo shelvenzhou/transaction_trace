@@ -14,6 +14,8 @@ class AttackCandidateEncoder(json.JSONEncoder):
                 # "intentions": obj.intentions,
                 "results": obj.results,
             }
+        if isinstance(obj, set):
+            return str(obj)
         return json.JSONEncoder.default(self, obj)
 
 
