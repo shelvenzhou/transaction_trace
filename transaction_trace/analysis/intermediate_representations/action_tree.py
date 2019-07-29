@@ -51,7 +51,7 @@ class ActionTree:
         return ancestors
 
     @staticmethod
-    def build_action_tree(tx_hash, traces, subtraces):
+    def build_action_tree(traces, subtraces):
         tx = None
         tree = nx.DiGraph()
         errs = list()
