@@ -14,16 +14,25 @@ class EVMExecutor:
         current_dir = os.path.dirname(os.path.realpath(__file__))
         self.evm_filepath = os.path.join(current_dir + "/../res/bin", self.evm)
 
+        self._deployed_code_cache = dict()
+
         self._storage_access_cache = dict()
         self._access_history = list()
         self._cache_len = cache_len
 
     def deployed_code(self, creation_code):
+        creation_code = creation_code.replace("0x", "")
+
+        if creation_code in self._deployed_code_cache:
+            return self._deployed_code_cache[creation_code]
+
         result = subprocess.run([self.evm_filepath,
                                  "--create",
-                                 "--code", creation_code.replace("0x", ""),
+                                 "--code", creation_code,
                                  "run"], stdout=subprocess.PIPE)
-        return result.stdout.decode("utf-8").split("\n")[-2]
+        code = result.stdout.decode("utf-8").split("\n")[-2]
+        self._deployed_code_cache[creation_code] = code
+        return code
 
     def log_storage_accesses(self, deployed_code, input_data):
         if deployed_code is None:

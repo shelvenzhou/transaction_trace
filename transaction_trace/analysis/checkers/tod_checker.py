@@ -46,17 +46,19 @@ class CachedCodeDatabase:
 
     def __init__(self, passwd):
         self.code_database = ContractCode(passwd=passwd)
-        self.cache = dict()
+
+        self.bytecodes = dict()
+        for row in self.code_database.read("byte_code", "distinct(bytecode_hash), bytecode"):
+            self.bytecodes[row[0]] = row[1]
+
+        self.contract_bytecode = dict()
+        for row in self.code_database.read("byte_code", "address, bytecode_hash"):
+            self.contract_bytecode[row[0]] = row[1]
 
     def read_bytecode(self, contract):
-        if contract not in self.cache:
-            code = list(self.code_database.read_bytecode(contract))
-            if len(code) == 1:
-                self.cache[contract] = code[0][0]
-            else:
-                l.debug("%d byte code for %s", len(code), contract)
-                self.cache[contract] = None
-        return self.cache[contract]
+        if contract not in self.contract_bytecode:
+            return None
+        return self.bytecodes[self.contract_bytecode[contract]]
 
 
 class TODChecker(Checker):
