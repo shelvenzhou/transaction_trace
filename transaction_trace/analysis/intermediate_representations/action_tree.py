@@ -25,10 +25,11 @@ class ActionTree:
     def extract_trace_id_from_node(node):
         return node.split(":")[0]
 
-    def __init__(self, tx, tree, errs, destructed_contracts):
+    def __init__(self, tx, tree, errs, created_contracts, destructed_contracts):
         self.tx = tx
         self.t = tree
         self.errs = errs
+        self.created_contracts = created_contracts
         self.destructed_contracts = destructed_contracts
 
     def __repr__(self):
@@ -56,6 +57,7 @@ class ActionTree:
         tx = None
         tree = nx.DiGraph()
         errs = list()
+        created_contracts = dict()
         destructed_contracts = dict()
         for trace_id, parent_trace_id in subtraces.items():
             trace = traces[trace_id]
@@ -85,13 +87,18 @@ class ActionTree:
             if trace['status'] == 0:
                 errs.append(dict(trace))
 
-            # record successful suicide
-            if trace['trace_type'] == 'suicide' and trace['status'] == 1:
-                destructed_contracts[trace['from_address']] = {
-                    "refund_addr": trace['to_address'],
-                    "value": trace['value'],
-                }
+            # record successful create and suicide
+            if trace['status'] == 1:
+                if trace['trace_type'] == 'create':
+                    created_contracts[trace['to_address']] = {
+                        "creator": trace['from_address'],
+                    }
+                if trace['trace_type'] == 'suicide':
+                    destructed_contracts[trace['from_address']] = {
+                        "refund_addr": trace['to_address'],
+                        "value": trace['value'],
+                    }
 
             tree.add_edge(from_node, to_node, **dict(trace))
 
-        return ActionTree(tx, tree, errs, destructed_contracts)
+        return ActionTree(tx, tree, errs, created_contracts, destructed_contracts)

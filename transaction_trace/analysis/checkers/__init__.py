@@ -7,3 +7,4 @@ from .reentrancy_checker import ReentrancyChecker
 from .profit_checker import ProfitChecker
 from .call_after_destruct_checker import CallAfterDestructChecker
 from .tod_checker import TODChecker
+from .honeypot_checker import HoneypotChecker

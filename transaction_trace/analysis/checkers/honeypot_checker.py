@@ -3,230 +3,170 @@ from collections import defaultdict
 from datetime import timedelta, timezone
 
 from ...basic_utils import DatetimeUtils
-from ..trace_analysis import TraceAnalysis
+from ..intermediate_representations import ActionTree
+from ..results import ResultType, AttackCandidate
+from .checker import Checker, CheckerType
 
-l = logging.getLogger("transaction-trace.analysis.Honeypot")
+l = logging.getLogger("transaction-trace.analysis.checker.HoneypotChecker")
 
 
-class Honeypot(TraceAnalysis):
-    def __init__(self, db_folder, log_file):
-        super(Honeypot, self).__init__(db_folder, log_file)
+class HONEYPOT_STATUS:
+    CREATED = "CREATED"
+    INITIALIZED = "INITIALIZED"
+    PROFITED = "PROFITED"
+    WITHDRAWED = "WITHDRAWED"
 
-    def find_honeypot(self, from_time, to_time,
-                      # 1 ETH <= bonus <= 10 ETH
-                      least_bonus=1000000000000000000, most_bonus=10000000000000000000,
-                      least_fee=100000000000000000  # Each guess takes at least 0.1 ETH
-                      ):
-        ABNORMAL_TYPE = "Honeypot"
 
-        class STATUS:
-            CREATED = 0
-            INITIALIZED = 1
-            PROFITED = 2
-            WITHDRAWED = 3
+class Honeypot:
+    def __init__(self, contract_addr, creater, create_tx, create_time):
+        self.contract_addr = contract_addr
 
-        class Honeypot:
-            def __init__(self, contract_addr, creater, create_time):
-                self.contract_addr = contract_addr
-                self.creater = creater
-                self.create_time = create_time
-                self.status = STATUS.CREATED
+        self.status = HONEYPOT_STATUS.CREATED
 
-                self.profited = False
-                self.profit = 0
+        self.creater = creater
+        self.create_time = create_time
+        self.create_tx = create_tx
 
-                self.init_time = None
-                self.bonus = 0
+        self.bonus = 0
+        self.init_tx = None
 
-            def __repr__(self):
-                if self.status == STATUS.CREATED:
-                    return "honeypot %s created" % (self.contract_addr)
-                elif self.status == STATUS.INITIALIZED:
-                    return "honeypot %s initialzed with %d wei bonus at %s" % (
-                        self.contract_addr,
-                        self.bonus,
-                        DatetimeUtils.time_to_str(self.init_time)
-                    )
-                elif self.status == STATUS.PROFITED:
-                    return "honeypot %s profited %d wei with %d wei bonus initialized at %s" % (
-                        self.contract_addr,
-                        self.profit,
-                        self.bonus,
-                        DatetimeUtils.time_to_str(self.init_time)
-                    )
-                else:
-                    r = "honeypot %s closed with %d wei bonus initialized at %s" % (
-                        self.contract_addr,
-                        self.bonus,
-                        DatetimeUtils.time_to_str(self.init_time)
-                    )
+        self.profited = False
+        self.profit = 0
+        self.profit_txs = list()
 
-                    if self.profited:
-                        r += "with %d wei profit" % (self.profit)
+        self.withdrawed = 0
+        self.withdraw_tx = None
 
-                    return r
+    def init(self, init_tx, from_addr, value):
+        if self.status != HONEYPOT_STATUS.CREATED:
+            return False
+        if from_addr != self.creater:
+            return False
 
-            def init(self, from_addr, value, init_time):
-                if self.status != STATUS.CREATED:
-                    return False
+        self.status = HONEYPOT_STATUS.INITIALIZED
+        self.bonus = value
+        self.init_tx = init_tx
+        return True
 
-                if from_addr != self.creater:
-                    return False
+    def income(self, profit_tx, from_addr, value):
+        if self.status != HONEYPOT_STATUS.INITIALIZED or self.status != HONEYPOT_STATUS.PROFITED:
+            return False
+        if from_addr == self.creater:
+            return False
 
-                if value < least_bonus or value > most_bonus:
-                    return False
+        self.status = HONEYPOT_STATUS.PROFITED
+        self.profited = True
+        self.profit += value
+        self.profit_txs.append(profit_tx)
+        return True
 
-                self.status = STATUS.INITIALIZED
-                self.init_time = init_time
-                self.bonus = value
+    def withdraw(self, withdraw_tx, to_addr, value):
+        if self.status != HONEYPOT_STATUS.INITIALIZED or self.status != HONEYPOT_STATUS.PROFITED:
+            return False
+        # if value != self.bonus + self.profit:
+        #     return False
 
-                return True
+        self.status = HONEYPOT_STATUS.WITHDRAWED
+        self.withdrawed = value
+        self.withdraw_tx = withdraw_tx
+        return True
 
-            def income(self, from_addr, value):
-                if self.status != STATUS.INITIALIZED or self.status != STATUS.PROFITED:
-                    return False
 
-                if from_addr == self.creater:
-                    return False
+class HoneypotChecker(Checker):
 
-                if value < least_fee:
-                    return False
-
-                self.status = STATUS.PROFITED
-                self.profited = True
-                self.profit += value
-
-                return True
-
-            def withdraw(self, to_addr, value):
-                if self.status != STATUS.INITIALIZED or self.status != STATUS.PROFITED:
-                    return False
-
-                if value != self.bonus + self.profit:
-                    return False
-
-                self.status = STATUS.WITHDRAWED
-
-                return True
+    def __init__(self, time_window=timedelta(hours=10)):
+        super(HoneypotChecker, self).__init__("honeypot")
 
         # contract addr -> Honeypot
-        tracked_honeypot = dict()
-        # contracts failed to be initialized in 30min will not be tracked
-        last_created = set()
-        current_created = set()
+        self.tracked_honeypots = dict()
+        # use a time window to reduce the contract to track
+        self.time_window = time_window
+        self.window_start = None
+        self.window_end = None
+        self.last_created = set()
+        self.current_created = set()
 
-        # use time window of 30min to avoiding taking too much memory
-        WINDOW_LENGTH = timedelta(minutes=30)
+    @property
+    def checker_type(self):
+        return CheckerType.CONTRACT_CENTRIC
 
-        window_start = DatetimeUtils.str_to_date(from_time) if isinstance(
-            from_time, str) else from_time
-        window_start = window_start.replace(tzinfo=timezone.utc)
-        window_end = window_start + WINDOW_LENGTH
+    def _stop_track(self, contract):
+        self.tracked_honeypots.pop(contract)
+        if contract in self.current_created:
+            self.current_created.remove(contract)
+        if contract in self.last_created:
+            self.last_created.remove(contract)
 
-        for db_conn in self.database.get_connections(from_time, to_time):
-            traces = defaultdict(dict)
-            error_txs = set()
-            block_times = dict()
+    def check_transaction(self, action_tree, result_graph):
+        tx = action_tree.tx
+        at = action_tree.t
 
-            l.info("Prepare data from %s", db_conn)
-            for row in db_conn.read_traces(with_rowid=True):
-                block_number = row["block_number"]
-                tx_index = row["transaction_index"]
-                block_time = row["block_timestamp"]
+        if self.window_start is None:
+            self.window_start = tx.block_timestamp.replace(tzinfo=timezone.utc)
+            self.window_end = self.window_start + self.time_window
 
-                if block_number is None or tx_index is None:
+        tx_time = tx.block_timestamp.replace(tzinfo=timezone.utc)
+        if tx_time > self.window_end:
+            # time window moves
+            self.window_start = self.window_end
+            self.window_end = self.window_end = self.window_start + self.time_window
+
+            for contract in self.last_created:
+                self.tracked_honeypots.pop(contract)
+
+            self.last_created = self.current_created
+            self.current_created = set()
+
+        for created_contract, details in action_tree.created_contracts.items():
+            self.current_created.add(created_contract)
+            self.tracked_honeypots[created_contract] = Honeypot(created_contract, details["creator"], tx.tx_hash, tx_time)
+
+        for e in at.edges():
+            from_address = ActionTree.extract_address_from_node(e[0])
+            to_address = ActionTree.extract_address_from_node(e[1])
+            trace = at.edges[e]
+
+            if trace["status"] == 0 or trace["trace_type"] != "call":
+                continue
+
+            value = trace["value"]
+            if value == 0:
                     continue
 
-                if block_number not in block_times:
-                    block_times[block_number] = block_time
+            if to_address in self.current_created or to_address in self.last_created:
+                succ = self.tracked_honeypots[to_address].init(tx.tx_hash, from_address, value)
+                if not succ:
+                    self._stop_track(to_address)
+                else:
+                    if to_address in self.current_created:
+                        self.current_created.remove(to_address)
+                    if to_address in self.last_created:
+                        self.last_created.remove(to_address)
+            elif to_address in self.tracked_honeypots:
+                succ = self.tracked_honeypots[to_address].income(tx.tx_hash, from_address, value)
+                if not succ:
+                    self._stop_track(to_address)
+            elif from_address in self.tracked_honeypots:
+                succ = self.tracked_honeypots[from_address].withdraw(tx.tx_hash, to_address, value)
+                if not succ:
+                    self._stop_track(from_address)
 
-                if row["error"] is not None:
-                    error_txs.add((block_number, tx_index))
-                    traces[block_number].pop(tx_index, None)
-                    continue
-                if (block_number, tx_index) in error_txs:
-                    continue
-
-                if tx_index not in traces[block_number]:
-                    traces[block_number][tx_index] = list()
-                traces[block_number][tx_index].append(dict(row))
-
-            l.info("Begin analysis")
-
-            for block_number in sorted(traces):
-                block_txs = traces[block_number]
-                block_time = block_times[block_number]
-
-                if block_time > window_end:
-                    # window move
-                    window_start = window_end
-                    window_end = window_start + WINDOW_LENGTH
-
-                    for contract in last_created:
-                        tracked_honeypot.pop(contract)
-
-                    last_created = current_created
-                    current_created = set()
-
-                for tx_index in sorted(block_txs):
-                    tx_traces = block_txs[tx_index]
-
-                    for trace in tx_traces:
-                        tx_hash = trace["transaction_hash"]
-                        to_addr = trace["to_address"]
-                        from_addr = trace["from_address"]
-
-                        if trace["trace_type"] == "create":
-                            if to_addr is None:  # failed create
-                                break
-                            current_created.add(to_addr)
-                            tracked_honeypot[to_addr] = Honeypot(
-                                to_addr, from_addr, block_time)
-                            l.debug("TX %s creates %s", tx_hash, to_addr)
-                            break
-
-                        value = trace["value"]
-                        if to_addr in current_created or to_addr in last_created:
-                            l.debug("TX %s transfers %d to %s to init honeypot",
-                                    tx_hash, value, to_addr)
-
-                            if to_addr in current_created:
-                                current_created.remove(to_addr)
-                            if to_addr in last_created:
-                                last_created.remove(to_addr)
-
-                            succ = tracked_honeypot[to_addr].init(
-                                from_addr, value, block_time)
-                            if succ:
-                                l.debug(
-                                    "potential honeypot initialized in %s", to_addr)
-                            else:
-                                tracked_honeypot.pop(to_addr)
-                                l.debug(
-                                    "illegal initialization for %s", to_addr)
-
-                        elif to_addr in tracked_honeypot:
-                            l.debug("%s receives %d", to_addr, value)
-
-                            succ = tracked_honeypot[to_addr].income(
-                                from_addr, value)
-                            if not succ:
-                                tracked_honeypot.pop(to_addr)
-
-                        elif from_addr in tracked_honeypot:
-                            succ = tracked_honeypot[from_addr].withdraw(
-                                to_addr, value)
-
-                            if not succ:
-                                tracked_honeypot.pop(from_addr)
-                                if from_addr in current_created:
-                                    current_created.remove(from_addr)
-                                if from_addr in last_created:
-                                    last_created.remove(from_addr)
-
-        for _, honeypot in tracked_honeypot.items():
-            self.record_abnormal_detail(
-                DatetimeUtils.time_to_str(honeypot.create_time),
-                ABNORMAL_TYPE,
-                str(honeypot)
-            )
+    def attack_candidates(self):
+        for addr, honeypot in self.tracked_honeypots.items():
+            if honeypot.status != HONEYPOT_STATUS.CREATED:
+                yield AttackCandidate(
+                    self.name,
+                    {
+                        "contract": honeypot.contract_addr,
+                        "status": honeypot.status,
+                        "create_time": DatetimeUtils.time_to_str(honeypot.create_time),
+                        "create_tx": honeypot.create_tx,
+                        "bonus": honeypot.bonus,
+                        "profit_txs": honeypot.profit_txs,
+                        "withdraw_tx": honeypot.withdraw_tx,
+                    },
+                    {
+                        "profits": honeypot.profit,
+                        "withdrawed_eth": honeypot.withdrawed,
+                    }
+                )

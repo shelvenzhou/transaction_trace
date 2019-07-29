@@ -29,7 +29,7 @@ def main(db_folder, mysql_password, log_path):
     tca.register_transaction_centric_checker(AirdropHuntingChecker())
     tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
     tca.register_transaction_centric_checker(ReentrancyChecker(5))
-    # tca.register_transaction_centric_checker(HoneypotChecker())
+    tca.register_transaction_centric_checker(HoneypotChecker())
     tca.register_transaction_centric_checker(CallAfterDestructChecker())
     tca.register_transaction_centric_checker(TODChecker(mysql_password))
 
@@ -42,6 +42,11 @@ def main(db_folder, mysql_password, log_path):
                 candidate_file.dump_candidate(candidate)
             for failure in call_tree.tx.failed_attacks:
                 failure_file.dump_candidate(failure)
+
+    if "honeypot" in tca.checkers:
+        honeypot_checker = tca.checkers["honeypot"]
+        for honeypot in honeypot_checker.attack_candidates():
+            candidate_file.dump_candidate(honeypot)
 
 
 if __name__ == '__main__':
