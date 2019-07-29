@@ -7,14 +7,13 @@ from .trace_analysis import TraceAnalysis
 l = logging.getLogger("transaction-trace.analysis.TransactionCentricAnalysis")
 
 
-class TransactionCentricAnalysis(TraceAnalysis):
+class TransactionCentricAnalysis:
 
     def __init__(self):
-        super(TransactionCentricAnalysis, self).__init__()
         self.checkers = dict()
 
     def register_transaction_centric_checker(self, checker):
-        assert checker.checker_type == CheckerType.TRANSACTION_CENTRIC, "try to register a checker of wrong type"
+        # assert checker.checker_type == CheckerType.TRANSACTION_CENTRIC, "try to register a checker of wrong type"
         self.checkers[checker.name] = checker
 
     def do_analysis(self, call_tree, result_graph):

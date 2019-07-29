@@ -184,6 +184,11 @@ class SensitiveAPIs:
         return callee in cls._sensitive_functions['owner'] or callee in cls._sensitive_functions['token']
 
     @classmethod
+    def token_transfer_call(cls, input_data):
+        callee = extract_function_signature(input_data)
+        return callee in cls._sensitive_functions['token']
+
+    @classmethod
     def get_result_details(cls, trace):
         input_data = trace['input']
 

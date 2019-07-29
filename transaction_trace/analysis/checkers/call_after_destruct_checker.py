@@ -1,78 +1,81 @@
 import logging
 from collections import defaultdict
 
+import IPython
+
 from ...basic_utils import DatetimeUtils
 from ...local import DatabaseName
+from ..intermediate_representations import ActionTree
 from ..knowledge import SensitiveAPIs
-from ..results import AttackCandidate
+from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.checkers.CallAfterDestructChecker")
 
 
+class DestructLog:
+
+    def __init__(self, tx_hash, contract, block_number, tx_index):
+        self.tx_hash = tx_hash
+        self.contract = contract
+        self.block_number = block_number
+        self.tx_index = tx_index
+
+
 class CallAfterDestructChecker(Checker):
 
-    def __init__(self, attack_candidate_exporter):
+    def __init__(self):
         super(CallAfterDestructChecker, self).__init__("call-after-destruct-checker")
-        self.out = attack_candidate_exporter
+        self.destruct_contracts = dict()
 
     @property
     def checker_type(self):
         return CheckerType.CONTRACT_CENTRIC
 
-    def do_check(self, **kwargs):
-        self.check_destruct_contracts()
+    def check_transaction(self, action_tree, result_graph):
+        tx = action_tree.tx
+        at = action_tree.t
 
-    def check_destruct_contracts(self):
-        destruct_contracts = dict()
-        for conn in self.database[DatabaseName.TRACE_DATABASE].get_all_connnections():
-            traces = dict()
-            for row in conn.read('traces', "transaction_hash, from_address, to_address, value, input, status, block_timestamp"):
-                if row['trace_type'] not in ('call', 'suicide'):
-                    continue
-                block_timestamp = DatetimeUtils.time_to_str(row['block_timestamp'])
-                if block_timestamp not in traces:
-                    traces[block_timestamp] = defaultdict(list)
+        for e in at.edges():
+            from_address = ActionTree.extract_address_from_node(e[0])
+            to_address = ActionTree.extract_address_from_node(e[1])
+            trace = at.edges[e]
 
-                tx_hash = row['transaction_hash']
-                traces[block_timestamp][tx_hash].append(row)
+            if trace["status"] == 0:
+                continue
 
-            for block_timestamp in sorted(list(traces.keys())):
-                for tx_hash in traces[block_timestamp]:
-                    candidate = AttackCandidate(
-                        self.name,
-                        {
-                            'transaction': tx_hash,
-                            'block_timestamp': block_timestamp,
-                            'calls': []
-                        },
-                        {'eth_loss': 0},
+            if trace["trace_type"] == "call" and to_address in self.destruct_contracts:
+                if trace["value"] > 0:
+                    tx.attack_candidates.append(
+                        AttackCandidate(
+                            self.name,
+                            {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                            {ResultType.ETHER_TRANSFER: trace["value"]}
+                        )
                     )
-                    for trace in traces[block_timestamp][tx_hash]:
-                        if trace["status"] == 0:
-                            continue
+                for result_type, src, dst, amount in SensitiveAPIs.get_result_details(trace):
+                    if result_type == ResultType.TOKEN_TRANSFER:
+                        token_contract = to_address
+                        tx.attack_candidates.append(
+                            AttackCandidate(
+                                self.name,
+                                {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                                {f"{ResultType.TOKEN_TRANSFER}:{token_contract}": amount}
+                            )
+                        )
+                    elif result_type == ResultType.OWNER_CHANGE:
+                        tx.attack_candidates.append(
+                            AttackCandidate(
+                                self.name,
+                                {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                                {f"{ResultType.OWNER_CHANGE}": f"owned_contract:{src} to_owner:{dst}"}
+                            )
+                        )
 
-                        to_address = trace["to_address"]
-                        if trace['trace_type'] == 'suicide':
-                            destruct_contracts[to_address] = {
-                                'destruct_time': block_timestamp,
-                                'destruct_tx_hash': tx_hash,
-                                'value': trace['value']
-                            }
-                            continue
-
-                        if to_address in destruct_contracts and block_timestamp > destruct_contracts[to_address]["destruct_time"]:
-                            if SensitiveAPIs.sensitive_function_call(trace["input"]):
-                                called_func = SensitiveAPIs.func_name(trace["input"])
-                                candidate.details['calls'].append({
-                                    'sensitive_func': called_func,
-                                    'target': {
-                                        'contract_address': to_address,
-                                        'destruct_time': destruct_contracts[to_address]["destruct_time"]
-                                    }
-                                })
-                            candidate.results['eth_loss'] += trace['value']
-
-                    if candidate.details['calls'] or candidate.results['eth_loss']:
-                        l.info("CallAfterDestruct found for tx: %s", tx_hash)
-                        out.dump_candidate(candidate)
+        # save destructed contracts after we have checked all the calls
+        # TODO: shall we check same-tx CAD?
+        for contract in action_tree.destructed_contracts:
+            if contract in self.destruct_contracts:
+                l.warning("contract suicides twice")
+                IPython.embed()
+            self.destruct_contracts[contract] = DestructLog(tx.tx_hash, contract, tx.block_number, tx.tx_index)

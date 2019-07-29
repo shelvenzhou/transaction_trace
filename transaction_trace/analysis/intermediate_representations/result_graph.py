@@ -1,5 +1,6 @@
 import logging
 
+import IPython
 import networkx as nx
 from networkx.algorithms.traversal import dfs_edges
 
@@ -125,7 +126,6 @@ class ResultGraph:
         if len(root) > 1:
             l.warning("more than one root in action tree of %s",
                       action_tree.tx.tx_hash)
-            import IPython
             IPython.embed()
 
         result_tree = ResultGraph.build_result_tree(action_tree)
