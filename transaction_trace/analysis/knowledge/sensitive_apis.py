@@ -231,5 +231,6 @@ class SensitiveAPIs:
                 amount = paras[index[2]]
                 yield ResultType.TOKEN_TRANSFER, src, dst, amount
 
-        else:  # this should never be reached
-            l.warning("unknown sensitive function signature %s", sig)
+        else:
+            l.debug("unknown sensitive function signature %s", sig)
+            yield sig, None, None, None

@@ -45,6 +45,9 @@ class CallAfterDestructChecker(Checker):
                 continue
 
             if trace["trace_type"] == "call" and to_address in self.destruct_contracts:
+                tx.is_attack = True
+                l.debug("%s call %s after suicide in %s", tx.tx_hash,
+                        to_address, self.destruct_contracts[to_address].tx_hash)
                 if trace["value"] > 0:
                     tx.attack_candidates.append(
                         AttackCandidate(
@@ -53,24 +56,33 @@ class CallAfterDestructChecker(Checker):
                             {ResultType.ETHER_TRANSFER: trace["value"]}
                         )
                     )
-                for result_type, src, dst, amount in SensitiveAPIs.get_result_details(trace):
-                    if result_type == ResultType.TOKEN_TRANSFER:
-                        token_contract = to_address
-                        tx.attack_candidates.append(
-                            AttackCandidate(
-                                self.name,
-                                {"transaction": tx.tx_hash, "suicided_contract": to_address},
-                                {f"{ResultType.TOKEN_TRANSFER}:{token_contract}": amount}
+                else:
+                    for result_type, src, dst, amount in SensitiveAPIs.get_result_details(trace):
+                        if result_type == ResultType.TOKEN_TRANSFER:
+                            token_contract = to_address
+                            tx.attack_candidates.append(
+                                AttackCandidate(
+                                    self.name,
+                                    {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                                    {f"{ResultType.TOKEN_TRANSFER}:{token_contract}": amount}
+                                )
                             )
-                        )
-                    elif result_type == ResultType.OWNER_CHANGE:
-                        tx.attack_candidates.append(
-                            AttackCandidate(
-                                self.name,
-                                {"transaction": tx.tx_hash, "suicided_contract": to_address},
-                                {f"{ResultType.OWNER_CHANGE}": f"owned_contract:{src} to_owner:{dst}"}
+                        elif result_type == ResultType.OWNER_CHANGE:
+                            tx.attack_candidates.append(
+                                AttackCandidate(
+                                    self.name,
+                                    {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                                    {f"{ResultType.OWNER_CHANGE}": f"owned_contract:{src} to_owner:{dst}"}
+                                )
                             )
-                        )
+                        else:
+                            tx.failed_attacks.append(
+                                AttackCandidate(
+                                    self.name,
+                                    {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                                    {"CALL": result_type}
+                                )
+                            )
 
         # save destructed contracts after we have checked all the calls
         # TODO: shall we check same-tx CAD?
