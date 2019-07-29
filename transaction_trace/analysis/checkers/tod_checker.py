@@ -87,6 +87,15 @@ class TODChecker(Checker):
                 if len(accessed_txs) < 2:
                     continue
 
+                # skip txs which cause no ether flow
+                ether_related = False
+                for accessed_tx in accessed_txs:
+                    if accessed_tx.cause_ether_flow:
+                        ether_related = True
+                        break
+                if not ether_related:
+                    continue
+
                 # cross-tx read after write is regarded as TOD
                 stored_index = dict()
                 affected_txs = list()
