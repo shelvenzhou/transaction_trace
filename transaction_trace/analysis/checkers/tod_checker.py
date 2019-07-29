@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 
 from ...local import ContractCode, EVMExecutor
-from ..results import AttackCandidate
+from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.checker.TODChecker")
@@ -23,6 +23,8 @@ class StorageAccess:
         self.deployed_code = deployed_code if deployed_code != "0x" else contract_code
 
         self.inputs = set()
+
+        self.cause_ether_flow = False
 
         self._storage_accesses = None
 
@@ -73,6 +75,7 @@ class TODChecker(Checker):
     def check_transaction(self, action_tree, result_graph):
         tx = action_tree.tx
         at = action_tree.t
+        rg = result_graph.g
 
         if self.latest_block is None:
             self.latest_block = tx.block_number
@@ -85,6 +88,7 @@ class TODChecker(Checker):
                 # cross-tx read after write is regarded as TOD
                 stored_index = dict()
                 affected_txs = list()
+                ether_flow = False
                 for accessed_tx in accessed_txs:
                     affected = False
                     affected_by = list()
@@ -100,6 +104,9 @@ class TODChecker(Checker):
                             stored_index[index] = accessed_tx.tx_hash
 
                     if affected:
+                        if accessed_tx.cause_ether_flow:
+                            ether_flow = True
+
                         affected_txs.append(
                             {
                                 "affected_tx": accessed_tx.tx_hash,
@@ -109,18 +116,21 @@ class TODChecker(Checker):
 
                 if len(affected_txs) > 0:
                     tx.is_attack = True
-                    tx.attack_candidates.append(
-                        AttackCandidate(
-                            self.name,
-                            {
-                                "contract": contract,
-                                "block_number": self.latest_block,
-                            },
-                            {
-                                "affected_txs": affected_txs,
-                            }
-                        )
+                    candidate = AttackCandidate(
+                        self.name,
+                        {
+                            "contract": contract,
+                            "block_number": self.latest_block,
+                        },
+                        {
+                            "affected_txs": affected_txs,
+                        }
                     )
+                    if ether_flow:
+                        tx.attack_candidates.append(candidate)
+                    else:
+                        candidate.add_failed_reason("cause no ether flow")
+                        tx.failed_attacks.append(candidate)
 
             self.latest_block = tx.block_number
             self.contract_accesses.clear()
@@ -137,5 +147,13 @@ class TODChecker(Checker):
                     tx.tx_hash, called_contract, self.code_database.read_bytecode(called_contract))
             accesses[called_contract].inputs.add(trace["input"])
 
+        ether_flow = False
+        for e in rg.edges:
+            for result_type in rg.edges[e]:
+                if result_type == ResultType.ETHER_TRANSFER and rg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
+                    ether_flow = True
+
         for contract, access_log in accesses.items():
+            if ether_flow:
+                access_log.cause_ether_flow = True
             self.contract_accesses[contract].append(access_log)
