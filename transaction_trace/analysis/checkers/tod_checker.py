@@ -48,9 +48,11 @@ class CachedCodeDatabase:
         self.code_database = ContractCode(passwd=passwd)
 
         self.bytecodes = dict()
+        l.info("preload bytecodes")
         for row in self.code_database.read("byte_code", "distinct(bytecode_hash), bytecode"):
             self.bytecodes[row[0]] = row[1]
 
+        l.info("preload contracts' code hashes")
         self.contract_bytecode = dict()
         for row in self.code_database.read("byte_code", "address, bytecode_hash"):
             self.contract_bytecode[row[0]] = row[1]
@@ -146,25 +148,24 @@ class TODChecker(Checker):
             self.latest_block = tx.block_number
             self.contract_accesses.clear()
 
-        accesses = dict()
-        for e in at.edges:
-            trace = at.edges[e]
-            if trace["status"] == 0 or trace["trace_type"] != "call":
-                continue
+        # we only consider the storage dependence in direct call
+        root = [n for n, d in at.in_degree() if d == 0][0]
+        if len(at.edges(root)) != 1:
+            l.warning("%d direct call from root of %s", len(at.edges(root)), tx.tx_hash)
+        for e in at.edges(root):
+            direct_call = e
 
-            called_contract = trace["to_address"]
-            if called_contract not in accesses:
-                accesses[called_contract] = StorageAccess(
-                    tx.tx_hash, called_contract, self.code_database.read_bytecode(called_contract))
-            accesses[called_contract].inputs.add(trace["input"])
+        trace = at.edges[direct_call]
+        if trace["status"] == 0 or trace["trace_type"] != "call":
+            return
 
-        ether_flow = False
+        called_contract = trace["to_address"]
+        access = StorageAccess(tx.tx_hash, called_contract, self.code_database.read_bytecode(called_contract))
+        access.inputs.add(trace["input"])
+        access.cause_ether_flow = (trace["value"] > 0)
         for e in rg.edges:
             for result_type in rg.edges[e]:
                 if result_type == ResultType.ETHER_TRANSFER and rg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
                     ether_flow = True
 
-        for contract, access_log in accesses.items():
-            if ether_flow:
-                access_log.cause_ether_flow = True
-            self.contract_accesses[contract].append(access_log)
+        self.contract_accesses[called_contract].append(access)
