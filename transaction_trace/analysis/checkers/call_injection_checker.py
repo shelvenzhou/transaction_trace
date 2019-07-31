@@ -95,7 +95,7 @@ class CallInjectionChecker(Checker):
                         intentions["other_profits"][str(e)] = intention
                     sensitive_nodes.add(e[1])
 
-            if len(intentions) > 0:
+            if len(intentions["ancestor_profits"]) > 0 or len(intentions["other_profits"]) > 0:
                 attacks.append({
                     "entry_edge": parent_edge,
                     'intentions': intentions
@@ -132,7 +132,11 @@ class CallInjectionChecker(Checker):
                 profits,
             )
             if len(action_tree.errs) > 0:
-                candidate.add_failed_reason("reverted trace in tx")
+                errs = set()
+                for err in action_tree.errs:
+                    if err["error"] not in errs:
+                        candidate.add_failed_reason(err["error"])
+                    errs.add(err["error"])
                 tx.failed_attacks.append(candidate)
             else:
                 tx.attack_candidates.append(candidate)

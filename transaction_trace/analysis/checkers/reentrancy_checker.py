@@ -150,7 +150,11 @@ class ReentrancyChecker(Checker):
                 profits,
             )
             if len(action_tree.errs) > 0:
-                candidate.add_failed_reason("reverted trace in tx")
+                errs = set()
+                for err in action_tree.errs:
+                    if err["error"] not in errs:
+                        candidate.add_failed_reason(err["error"])
+                    errs.add(err["error"])
                 tx.failed_attacks.append(candidate)
             else:
                 tx.attack_candidates.append(candidate)
