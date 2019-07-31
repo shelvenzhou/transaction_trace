@@ -1,8 +1,6 @@
 import logging
 from collections import defaultdict
 
-import IPython
-
 from ...basic_utils import DatetimeUtils
 from ...local import DatabaseName
 from ..intermediate_representations import ActionTree
@@ -89,5 +87,4 @@ class CallAfterDestructChecker(Checker):
         for contract in action_tree.destructed_contracts:
             if contract in self.destruct_contracts:
                 l.warning("contract suicides twice")
-                IPython.embed()
             self.destruct_contracts[contract] = DestructLog(tx.tx_hash, contract, tx.block_number, tx.tx_index)
