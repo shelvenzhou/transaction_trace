@@ -25,12 +25,12 @@ def main(db_folder, mysql_password, log_path):
     failure_file = AttackCandidateExporter(failed_attacks)
 
     tca = TransactionCentricAnalysis()
-    tca.register_transaction_centric_checker(CallInjectionChecker())
-    tca.register_transaction_centric_checker(AirdropHuntingChecker())
-    tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
-    tca.register_transaction_centric_checker(ReentrancyChecker(5))
+    # tca.register_transaction_centric_checker(CallInjectionChecker())
+    # tca.register_transaction_centric_checker(AirdropHuntingChecker())
+    # tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
+    # tca.register_transaction_centric_checker(ReentrancyChecker(5))
     tca.register_transaction_centric_checker(HoneypotChecker())
-    tca.register_transaction_centric_checker(CallAfterDestructChecker())
+    # tca.register_transaction_centric_checker(CallAfterDestructChecker())
     # tca.register_transaction_centric_checker(TODChecker(mysql_password))
 
     for call_tree, result_graph in p.preprocess():
@@ -47,6 +47,10 @@ def main(db_folder, mysql_password, log_path):
         honeypot_checker = tca.checkers["honeypot"]
         for honeypot in honeypot_checker.attack_candidates():
             candidate_file.dump_candidate(honeypot)
+
+    with open("parity_losses.txt", "w+") as f:
+        for contract, value in p.parity_wallet_loss.items():
+            print("{}:{}".format(contract, value), file=f)
 
 
 if __name__ == '__main__':

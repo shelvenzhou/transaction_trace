@@ -49,7 +49,7 @@ class Honeypot:
         return True
 
     def income(self, profit_tx, from_addr, value):
-        if self.status != HONEYPOT_STATUS.INITIALIZED or self.status != HONEYPOT_STATUS.PROFITED:
+        if self.status != HONEYPOT_STATUS.INITIALIZED and self.status != HONEYPOT_STATUS.PROFITED:
             return False
         if from_addr == self.creater:
             return False
@@ -61,7 +61,7 @@ class Honeypot:
         return True
 
     def withdraw(self, withdraw_tx, to_addr, value):
-        if self.status != HONEYPOT_STATUS.INITIALIZED or self.status != HONEYPOT_STATUS.PROFITED:
+        if self.status != HONEYPOT_STATUS.INITIALIZED and self.status != HONEYPOT_STATUS.PROFITED:
             return False
         # if value != self.bonus + self.profit:
         #     return False
@@ -126,7 +126,7 @@ class HoneypotChecker(Checker):
             to_address = ActionTree.extract_address_from_node(e[1])
             trace = at.edges[e]
 
-            if trace["status"] == 0 or trace["trace_type"] != "call":
+            if trace["status"] == 0:
                 continue
 
             value = trace["value"]
