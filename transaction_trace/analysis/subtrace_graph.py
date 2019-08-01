@@ -190,6 +190,9 @@ class SubtraceGraphAnalyzer(TraceAnalysis):
                 if parent_trace_id is not None:
                     call_tree.add_edge(
                         parent_trace_id, trace_id, addr_from=cycle[i], addr_to=cycle[i+1])
+                else:
+                    call_tree.add_edge(
+                        -1, trace_id, addr_from=cycle[i], addr_to=cycle[i+1])
         for parent_trace_id, trace_id in extract_trace_info(graph, cycle[-1], cycle[0]):
             if parent_trace_id is not None:
                 call_tree.add_edge(parent_trace_id, trace_id,
