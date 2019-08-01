@@ -82,6 +82,10 @@ class EthereumDatabase:
             date = self._data_time_range[i]
             yield self.get_connection(date)
 
+    def get_all_connections(self):
+        for i in self._data_time_range:
+            yield self.get_connection(i)
+
     def read_traces(self, from_time, to_time):
         '''
         Time range can be datetime.datetime or string.

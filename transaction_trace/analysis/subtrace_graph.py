@@ -3,14 +3,88 @@ import logging
 from collections import defaultdict
 
 import networkx as nx
-from web3 import Web3
 
 from ..local import EthereumDatabase
 from .trace_util import TraceUtil
 from .trace_analysis import TraceAnalysis
 from ..datetime_utils import time_to_str
-
 l = logging.getLogger("transaction-trace.analysis.SubtraceGraph")
+
+
+
+import json
+
+JSON_FLAG = "__attack_candidate__"
+
+
+class AttackCandidateEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, AttackCandidate):
+            return {
+                JSON_FLAG: True,
+                "type": obj.type,
+                "details": obj.details,
+                # "intentions": obj.intentions,
+                "results": obj.results,
+            }
+        return json.JSONEncoder.default(self, obj)
+
+
+def as_attack_candidate(dct):
+    if JSON_FLAG in dct:
+        return AttackCandidate(
+            dct["type"],
+            dct["details"],
+            # dct["intentions"],
+            dct["results"]
+        )
+    return dct
+
+
+class AttackCandidate:
+
+    def __init__(self, vul_type, details, results):
+        self.type = vul_type
+        self.details = details
+        # self.intentions = intentions
+        self.results = results
+
+    def add_failed_reason(self, reason):
+        if "failed_reason" not in self.details:
+            self.details["failed_reason"] = list()
+
+        self.details["failed_reason"].append(reason)
+
+
+class AttackCandidateExporter:
+
+    @staticmethod
+    def dump_candidates(candidates, f):
+        json.dump(candidates, f, indent="\t", cls=AttackCandidateEncoder)
+        f.flush()
+
+    @staticmethod
+    def load_candidates(f):
+        return json.load(f, object_hook=as_attack_candidate)
+
+    def __init__(self, f):
+        self.file = f
+        self.first_item = True
+
+        self.file.write("[")
+
+    def __del__(self):
+        self.file.write("]")
+
+    def dump_candidate(self, candidate):
+        if self.first_item:
+            json.dump(candidate, self.file, indent="\t", cls=AttackCandidateEncoder)
+            self.first_item = False
+        else:
+            self.file.write(",")
+            json.dump(candidate, self.file, indent="\t", cls=AttackCandidateEncoder)
+        self.file.flush()
 
 
 class SubtraceGraph:
@@ -137,7 +211,7 @@ class SubtraceGraphAnalyzer(TraceAnalysis):
 
         return cycle_count, max_cycle_count
 
-    def find_reentrancy(self, graph, cycles, eth=None):
+    def find_reentrancy(self, graph, cycles):
         ABNORMAL_TYPE = "Reentrancy"
 
         l.debug("Searching for Reentrancy")
@@ -145,6 +219,8 @@ class SubtraceGraphAnalyzer(TraceAnalysis):
         if len(cycles) == 0:
             return
 
+        attacks = list()
+        eth = dict()
         f = False
         tx_hash = graph.graph["transaction_hash"]
         for cycle in cycles:
@@ -152,27 +228,29 @@ class SubtraceGraphAnalyzer(TraceAnalysis):
                 continue
 
             _, cycle_count = self.count_subtrace_cycle(graph, cycle)
-            if cycle_count > 5:
+            if cycle_count > 0:
                 l.info("Reentrancy found for %s with cycle count %d",
                        tx_hash, cycle_count)
                 detail = {
                     "date": graph.graph["date"],
-                    "abnormal_type": ABNORMAL_TYPE,
                     "tx_hash": tx_hash,
                     "cycle_count": cycle_count,
                     "cycle_nodes": cycle
                 }
-                self.record_abnormal_detail(detail)
+                attacks.append(detail)
+                # self.record_abnormal_detail(detail)
                 f = True
-        if f and eth != None:
+        if f:
             eth_transfer = defaultdict(lambda: defaultdict(int))
             for trace in self.analysis_cache["traces"][tx_hash].values():
+                if trace["status"] == 0:
+                    continue
+
                 value = trace["value"]
                 from_address = trace["from_address"]
                 to_address = trace["to_address"]
                 if value > 0:
-                    eth_transfer[from_address][to_address] += float(
-                        Web3.fromWei(value, "ether"))
+                    eth_transfer[from_address][to_address] += value
             eth_nodes = defaultdict(int)
             for from_address in eth_transfer:
                 for to_address in eth_transfer[from_address]:
@@ -187,12 +265,22 @@ class SubtraceGraphAnalyzer(TraceAnalysis):
                     lost = eth[tx_hash][node]
             l.info("Reentrancy eth lost for %s: %d", tx_hash, lost)
             detail = {
-                "date": graph.graph["date"],
-                "abnormal_type": ABNORMAL_TYPE,
                 "tx_hash": tx_hash,
                 "eth_lost": lost
             }
-            self.record_abnormal_detail(detail)
+            # self.record_abnormal_detail(detail)
+
+            return  AttackCandidate(
+                "reentrancy",
+                {
+                    "details":attacks,
+                },
+                {
+                    "results": detail
+                }
+            )
+
+        return None
 
     def find_bonus_hunitng(self, graph):
         ABNORMAL_TYPE = "BonusHunting"
@@ -227,7 +315,8 @@ class SubtraceGraphAnalyzer(TraceAnalysis):
             }
             self.record_abnormal_detail(detail)
 
-    def find_all_abnormal_behaviors(self, eth_lost=None):
+    def find_all_abnormal_behaviors(self, f):
+        exporter = AttackCandidateExporter(f)
         for subtrace_graph, traces, subtraces in self.subtrace_graph.subtrace_graphs_by_tx():
             l.debug("Searching for cycles in graph")
             cycles = list(nx.simple_cycles(subtrace_graph))
@@ -237,5 +326,8 @@ class SubtraceGraphAnalyzer(TraceAnalysis):
             if "subtraces" not in self.analysis_cache:
                 self.analysis_cache["subtraces"] = subtraces
 
-            self.find_reentrancy(subtrace_graph, cycles, eth_lost)
-            self.find_bonus_hunitng(subtrace_graph)
+            candidate = self.find_reentrancy(subtrace_graph, cycles)
+            if candidate is not None:
+                exporter.dump_candidate(candidate)
+
+            # self.find_bonus_hunitng(subtrace_graph)
