@@ -88,8 +88,10 @@ class AttackCandidateExporter:
 
 
 class SubtraceGraph:
-    def __init__(self, db_conn):
+    def __init__(self, db_conn, sensitive_contracts, concerned_contract):
         self._db_conn = db_conn
+        self.sensitive_contracts = sensitive_contracts
+        self.concerned_contract = concerned_contract
 
     def _subtrace_graph_by_tx(self, tx_hash, subtraces, traces):
         subtrace_graph = nx.DiGraph(
@@ -98,6 +100,8 @@ class SubtraceGraph:
             parent_trace_id = subtraces[trace_id]
             if parent_trace_id == None:
                 subtrace_graph.graph["caller"] = traces[trace_id]["from_address"]
+                if traces[trace_id]["to_address"] in self.sensitive_contracts:
+                    self.concerned_contract[traces[trace_id]["to_address"]] += 1
 
             trace = traces[trace_id]
             if trace["trace_type"] not in ("call", "create", "suicide"):

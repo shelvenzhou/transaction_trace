@@ -3,6 +3,8 @@ import logging
 import os
 import re
 
+
+from collections import defaultdict
 from sortedcontainers import SortedList
 
 from ..datetime_utils import date_to_str, str_to_date
