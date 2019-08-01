@@ -42,6 +42,12 @@ class AttackCandidate:
 
         self.details["failed_reason"].append(reason)
 
+    def __repr__(self):
+        if "transaction" in self.details:
+            return "{} attack of tx {}".format(self.type, self.details["transaction"])
+        elif "contract" in self.details:
+            return "{} attack of contract {}".format(self.type, self.details["contract"])
+
 
 class AttackCandidateExporter:
 

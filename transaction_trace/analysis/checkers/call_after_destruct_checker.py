@@ -23,7 +23,7 @@ class DestructLog:
 class CallAfterDestructChecker(Checker):
 
     def __init__(self):
-        super(CallAfterDestructChecker, self).__init__("call-after-destruct-checker")
+        super(CallAfterDestructChecker, self).__init__("call-after-destruct")
         self.destruct_contracts = dict()
 
     @property
