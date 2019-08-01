@@ -794,7 +794,8 @@ class HoneypotFinder(TraceAnalysis):
                     window_end = window_start + WINDOW_LENGTH
 
                     for contract in last_created:
-                        tracked_honeypot.pop(contract)
+                        if contract in tracked_honeypot:
+                            tracked_honeypot.pop(contract)
 
                     last_created = current_created
                     current_created = set()
@@ -831,7 +832,8 @@ class HoneypotFinder(TraceAnalysis):
                                 if to_addr in last_created:
                                     last_created.remove(to_addr)
                             else:
-                                tracked_honeypot.pop(to_addr)
+                                if to_addr in tracked_honeypot:
+                                    tracked_honeypot.pop(to_addr)
                                 if to_addr in current_created:
                                     current_created.remove(to_addr)
                                 if to_addr in last_created:
@@ -845,7 +847,8 @@ class HoneypotFinder(TraceAnalysis):
                             succ = tracked_honeypot[to_addr].income(tx_hash,
                                 from_addr, value)
                             if not succ:
-                                tracked_honeypot.pop(to_addr)
+                                if to_addr in tracked_honeypot:
+                                    tracked_honeypot.pop(to_addr)
                                 if to_addr in current_created:
                                     current_created.remove(to_addr)
                                 if to_addr in last_created:
@@ -858,7 +861,8 @@ class HoneypotFinder(TraceAnalysis):
                                 to_addr, value)
 
                             if not succ:
-                                tracked_honeypot.pop(from_addr)
+                                if from_addr in tracked_honeypot:
+                                    tracked_honeypot.pop(from_addr)
                                 if from_addr in current_created:
                                     current_created.remove(from_addr)
                                 if from_addr in last_created:
