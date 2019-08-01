@@ -24,32 +24,32 @@ def main(db_folder, mysql_password, log_path):
     candidate_file = AttackCandidateExporter(attack_candidates)
     failure_file = AttackCandidateExporter(failed_attacks)
 
-    tca = TransactionCentricAnalysis()
+    # tca = TransactionCentricAnalysis()
     # tca.register_transaction_centric_checker(CallInjectionChecker())
     # tca.register_transaction_centric_checker(AirdropHuntingChecker())
     # tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
     # tca.register_transaction_centric_checker(ReentrancyChecker(5))
-    tca.register_transaction_centric_checker(HoneypotChecker())
+    # tca.register_transaction_centric_checker(HoneypotChecker())
     # tca.register_transaction_centric_checker(CallAfterDestructChecker())
     # tca.register_transaction_centric_checker(TODChecker(mysql_password))
 
-    for call_tree, result_graph in p.preprocess():
-        if call_tree is None:
-            continue
-        tca.do_analysis(call_tree, result_graph)
-        if call_tree.tx.is_attack:
-            for candidate in call_tree.tx.attack_candidates:
-                candidate_file.dump_candidate(candidate)
-            for failure in call_tree.tx.failed_attacks:
-                failure_file.dump_candidate(failure)
+    check = HoneypotFinder(db_folder)
 
-    if "honeypot" in tca.checkers:
-        honeypot_checker = tca.checkers["honeypot"]
-        for honeypot in honeypot_checker.attack_candidates():
-            candidate_file.dump_candidate(honeypot)
+    # for ordered_traces in p.preprocess():
+    #     check.check_raw(ordered_traces)
+
+        # tca.do_analysis(call_tree, result_graph)
+        # if call_tree.tx.is_attack:
+        #     for candidate in call_tree.tx.attack_candidates:
+        #         candidate_file.dump_candidate(candidate)
+        #     for failure in call_tree.tx.failed_attacks:
+        #         failure_file.dump_candidate(failure)
+
+    for honeypot in check.find_honeypot("2015-08-07"):
+        candidate_file.dump_candidate(honeypot)
 
     with open("parity_losses.txt", "w+") as f:
-        for contract, value in p.parity_wallet_loss.items():
+        for contract, value in check.parity_wallet_loss.items():
             print("{}:{}".format(contract, value), file=f)
 
 
