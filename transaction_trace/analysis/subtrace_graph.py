@@ -100,7 +100,9 @@ class SubtraceGraph:
                 subtrace_graph.graph["caller"] = traces[trace_id]["from_address"]
 
             trace = traces[trace_id]
-            if trace["status"] == 0:
+            if trace["trace_type"] not in ("call", "create", "suicide"):
+                continue
+            if trace["status"] == 0 and trace["trace_type"] == "create":
                 continue
             from_address = trace["from_address"]
             to_address = trace["to_address"]
