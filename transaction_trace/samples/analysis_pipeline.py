@@ -28,10 +28,10 @@ def main(db_folder, mysql_password, log_path):
     tca.register_transaction_centric_checker(CallInjectionChecker())
     tca.register_transaction_centric_checker(AirdropHuntingChecker())
     tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
-    tca.register_transaction_centric_checker(ReentrancyChecker(5))
+    tca.register_transaction_centric_checker(ReentrancyChecker(0))
     tca.register_transaction_centric_checker(HoneypotChecker())
     tca.register_transaction_centric_checker(CallAfterDestructChecker())
-    # tca.register_transaction_centric_checker(TODChecker(mysql_password))
+    tca.register_transaction_centric_checker(TODChecker(mysql_password))
 
     for call_tree, result_graph in p.preprocess():
         if call_tree is None:
