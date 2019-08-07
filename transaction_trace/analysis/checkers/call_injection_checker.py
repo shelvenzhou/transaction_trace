@@ -1,3 +1,4 @@
+from ...basic_utils import DatetimeUtils
 from ..intermediate_representations import ActionTree, ResultGraph
 from ..knowledge import SensitiveAPIs, extract_function_signature
 from ..results import AttackCandidate, ResultType
@@ -127,6 +128,7 @@ class CallInjectionChecker(Checker):
                 self.name,
                 {
                     "transaction": tx.tx_hash,
+                    "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
                     "attacks": attacks,
                 },
                 profits,

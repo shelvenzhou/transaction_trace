@@ -2,6 +2,7 @@ from collections import defaultdict
 
 import networkx as nx
 
+from ...basic_utils import DatetimeUtils
 from ..intermediate_representations import ActionTree, ResultGraph
 from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
@@ -145,6 +146,7 @@ class ReentrancyChecker(Checker):
                 self.name,
                 {
                     "transaction": tx.tx_hash,
+                    "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
                     "attacks": intentions,
                 },
                 profits,

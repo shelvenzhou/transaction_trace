@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from ...basic_utils import DatetimeUtils
 from ..intermediate_representations import ResultGraph
 from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
@@ -67,6 +68,7 @@ class AirdropHuntingChecker(Checker):
                 self.name,
                 {
                     "transaction": tx.tx_hash,
+                    "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
                     "slave_number": len(slaves),
                     "hunting_time": len(intentions),
                 },

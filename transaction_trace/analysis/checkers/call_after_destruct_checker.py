@@ -61,7 +61,11 @@ class CallAfterDestructChecker(Checker):
                             tx.attack_candidates.append(
                                 AttackCandidate(
                                     self.name,
-                                    {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                                    {
+                                        "transaction": tx.tx_hash,
+                                        "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
+                                        "suicided_contract": to_address
+                                    },
                                     {f"{ResultType.TOKEN_TRANSFER}:{token_contract}": amount}
                                 )
                             )
@@ -69,18 +73,26 @@ class CallAfterDestructChecker(Checker):
                             tx.attack_candidates.append(
                                 AttackCandidate(
                                     self.name,
-                                    {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                                    {
+                                        "transaction": tx.tx_hash,
+                                        "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
+                                        "suicided_contract": to_address
+                                    },
                                     {f"{ResultType.OWNER_CHANGE}": f"owned_contract:{src} to_owner:{dst}"}
                                 )
                             )
-                        else:
-                            tx.failed_attacks.append(
-                                AttackCandidate(
-                                    self.name,
-                                    {"transaction": tx.tx_hash, "suicided_contract": to_address},
-                                    {"CALL": result_type}
-                                )
-                            )
+                        # else:
+                        #     tx.failed_attacks.append(
+                        #         AttackCandidate(
+                        #             self.name,
+                        #             {
+                        #                 "transaction": tx.tx_hash,
+                        #                 "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
+                        #                 "suicided_contract": to_address
+                        #             },
+                        #             {"CALL": result_type}
+                        #         )
+                        #     )
 
         # save destructed contracts after we have checked all the calls
         # TODO: shall we check same-tx CAD?

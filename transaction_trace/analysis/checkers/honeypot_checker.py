@@ -83,7 +83,7 @@ class Honeypot:
 
 class HoneypotChecker(Checker):
 
-    def __init__(self, time_window=timedelta(hours=10)):
+    def __init__(self, time_window=timedelta(days=10)):
         super(HoneypotChecker, self).__init__("honeypot")
 
         # contract addr -> Honeypot

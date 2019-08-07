@@ -1,5 +1,6 @@
 import pickle
 
+from ...basic_utils import DatetimeUtils
 from ..intermediate_representations import ResultGraph
 from ..knowledge import SensitiveAPIs
 from ..results import AttackCandidate, ResultType
@@ -13,8 +14,8 @@ class IntegerOverflowChecker(Checker):
     def __init__(self, threshold):
         super(IntegerOverflowChecker, self).__init__("integer-overflow")
         self.threshold = threshold
-        # with open(CONTRACT_CREATOR_PICKLE_PATH, 'rb') as f:
-        #     self.contract_creator = pickle.load(f)
+        with open(CONTRACT_CREATOR_PICKLE_PATH, 'rb') as f:
+            self.contract_creator = pickle.load(f)
 
     @property
     def checker_type(self):
@@ -30,8 +31,8 @@ class IntegerOverflowChecker(Checker):
             trace = at.edges[e]
             if trace['trace_type'] != "call":
                 continue
-            # if e[1] in self.contract_creator and tx.caller == self.contract_creator[e[1]]:
-            #     continue
+            if e[1] in self.contract_creator and tx.caller == self.contract_creator[e[1]]:
+                continue
 
             if SensitiveAPIs.sensitive_function_call(trace['input']):
                 func_name = SensitiveAPIs.func_name(trace['input'])
@@ -91,6 +92,7 @@ class IntegerOverflowChecker(Checker):
                 self.name,
                 {
                     "transaction": tx.tx_hash,
+                    "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
                     "attacks": intentions,
                 },
                 profits,
