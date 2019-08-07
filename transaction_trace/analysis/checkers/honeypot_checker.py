@@ -4,7 +4,7 @@ from datetime import timedelta, timezone
 
 from ...basic_utils import DatetimeUtils
 from ..intermediate_representations import ActionTree
-from ..results import ResultType, AttackCandidate
+from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
 
 l = logging.getLogger("transaction-trace.analysis.checker.HoneypotChecker")
@@ -39,6 +39,11 @@ class Honeypot:
         self.withdraw_to = None
         self.withdraw_txs = list()
 
+        self.tx_count = 0
+
+    def income_tx(self):
+        self.tx_count += 1
+
     def init(self, init_tx, from_addr, value):
         if self.status != HONEYPOT_STATUS.CREATED and self.status != HONEYPOT_STATUS.INITIALIZED:
             return False
@@ -48,6 +53,7 @@ class Honeypot:
         self.status = HONEYPOT_STATUS.INITIALIZED
         self.bonus += value
         self.init_txs.append(init_tx)
+        self.income_tx()
         return True
 
     def income(self, profit_tx, from_addr, value):
@@ -62,6 +68,7 @@ class Honeypot:
             self.profited = True
             self.profit += value
             self.profit_txs.append(profit_tx)
+        self.income_tx()
         return True
 
     def withdraw(self, withdraw_tx, to_addr, value):
@@ -78,6 +85,7 @@ class Honeypot:
             self.withdraw_to = to_addr
         self.withdraw_value += value
         self.withdraw_txs.append(withdraw_tx)
+        self.income_tx()
         return True
 
 
@@ -111,7 +119,6 @@ class HoneypotChecker(Checker):
         tx = action_tree.tx
         at = action_tree.t
 
-
         if self.window_start is None:
             self.window_start = tx.block_timestamp.replace(tzinfo=timezone.utc)
             self.window_end = self.window_start + self.time_window
@@ -130,9 +137,12 @@ class HoneypotChecker(Checker):
 
         for created_contract, details in action_tree.created_contracts.items():
             self.current_created.add(created_contract)
-            self.tracked_honeypots[created_contract] = Honeypot(created_contract, details["creator"], tx.tx_hash, tx_time)
+            self.tracked_honeypots[created_contract] = Honeypot(
+                created_contract, details["creator"], tx.tx_hash, tx_time)
 
-        for e in at.edges():
+        # we focus on direct calls
+        root = [n for n, d in at.in_degree() if d == 0][0]
+        for e in at.edges(root):
             from_address = ActionTree.extract_address_from_node(e[0])
             to_address = ActionTree.extract_address_from_node(e[1])
             trace = at.edges[e]
@@ -140,12 +150,11 @@ class HoneypotChecker(Checker):
             if trace["status"] == 0 or trace["trace_type"] not in ("call", "suicide"):
                 continue
 
-            # if to_address == "0x01f8c4e3fa3edeb29e514cba738d87ce8c091d3f" or from_address == "0x01f8c4e3fa3edeb29e514cba738d87ce8c091d3f":
-            #     import ipdb; ipdb.set_trace()
-
             value = trace["value"]
             if value == 0:
-                    continue
+                if to_address in self.tracked_honeypots or from_address in self.tracked_honeypots:
+                    self.tracked_honeypots[to_address].income_tx()
+                continue
 
             if to_address in self.current_created or to_address in self.last_created:
                 succ = self.tracked_honeypots[to_address].init(tx.tx_hash, from_address, value)
@@ -175,13 +184,15 @@ class HoneypotChecker(Checker):
                         "status": HONEYPOT_STATUS.WITHDRAWED if honeypot.withdrawed else honeypot.status,
                         "create_time": DatetimeUtils.time_to_str(honeypot.create_time),
                         "create_tx": honeypot.create_tx,
-                        "init_txs":honeypot.init_txs,
+                        "init_txs": honeypot.init_txs,
                         "profit_txs": honeypot.profit_txs,
                         "withdraw_txs": honeypot.withdraw_txs,
+                        "tx_count": honeypot.tx_count,
                     },
                     {
                         "bonus": honeypot.bonus,
                         "profits": honeypot.profit,
-                        "withdrawed_eth": honeypot.withdraw_value,
+                        "withdrawed": honeypot.withdraw_value,
+                        "left": honeypot.bonus + honeypot.profit - honeypot.withdraw_value,
                     }
                 )
