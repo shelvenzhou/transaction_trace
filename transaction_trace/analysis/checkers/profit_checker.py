@@ -158,13 +158,13 @@ class ProfitChecker(Checker):
             net_profits = dict()
             for result_type in candidate_profits[profit_node]:
                 outlay = 0
-                profit_account = None if checker == 'integer-overflow' else profit_node
+                profit_account = None if candidate.type == 'integer-overflow' else profit_node
                 victims = candidate_profits[profit_node][result_type]['victims']
                 if len(victims) == 0:
                     continue
                 for victim in victims:
                     outlay += self.check_contract_income_forward(
-                        victim, profit_account, DatetimeUtils.time_to_str(tx.block_timestamp), result_type)
+                        victim, profit_account, candidate.details['tx_time'], result_type)
 
                 net_profit = candidate_profits[profit_node][result_type]['amount'] - outlay
                 if net_profit > self.minimum_profit_amount[ResultGraph.extract_result_type(result_type)]:
