@@ -27,7 +27,7 @@ def main(db_folder, mysql_password, log_path, input_log_file=None):
     if input_log_file != None:
         with open(os.path.join(log_path, input_log_file), 'r') as f:
             candidates = AttackCandidateExporter.load_candidates(f)
-        cca = ContractCentricAnalysis(db_folder, idx_db_passwd=mysql_password)
+        cca = ContractCentricAnalysis(db_folder=db_folder, idx_db_passwd=mysql_password)
         cca.register_contract_centric_checker(ProfitChecker(candidate_file))
         for cand in candidates:
             cca.do_analysis(attack_candidate=cand)

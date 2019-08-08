@@ -6,8 +6,8 @@ from .database import Database
 
 class ContractTokenTransactions(Database):
 
-    def __init__(self, db_filepath, user="contract_token_txs_idx", passwd="password", db="contract_tokentxs_idx"):
-        super(ContractTokenTransactions, self).__init__(db_filepath, "", inner_db="mysql",
+    def __init__(self, user="contract_token_txs_idx", passwd="password", db="contract_tokentxs_idx"):
+        super(ContractTokenTransactions, self).__init__("mysql-contract_token_transactions", "", inner_db="mysql",
                                                    user=user,
                                                    passwd=passwd,
                                                    db=db)
@@ -42,6 +42,6 @@ class ContractTokenTransactions(Database):
         rows = self.read("contract_token_transactions", "transaction_date, transaction_hash", "WHERE contract=%s", (contract,))
         txs = defaultdict(list)
         for row in rows:
-            txs[date_to_str(row[0])].append(row[1])
+            txs[DatetimeUtils.date_to_str(row[0])].append(row[1])
 
         return txs

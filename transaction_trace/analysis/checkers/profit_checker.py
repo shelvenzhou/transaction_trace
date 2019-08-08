@@ -121,10 +121,12 @@ class ProfitChecker(Checker):
                     'amount': candidate.results[node][result_type]
                 }
 
+        # import ipdb;ipdb.set_trace()
         for attack in candidate.details['attacks']:
             for e in attack['intention']:
-                profit_node = e[1]
-                victim_node = e[0]
+                ee = eval(e)
+                profit_node = ee[1]
+                victim_node = ee[0]
 
                 if profit_node not in candidate.results:
                     continue
@@ -136,7 +138,7 @@ class ProfitChecker(Checker):
                     elif rt == ResultType.TOKEN_TRANSFER:
                         token_address = ResultGraph.extract_token_address(
                             result_type)
-                        ert = f"{ResultType.TOKEN_TRANSFER_EVENT}:{token_address}"
+                        ert = "{}:{}".format(ResultType.TOKEN_TRANSFER_EVENT, token_address)
                         if ert in candidate.results[profit_node]:
                             candidate_profits[profit_node][ert]['victims'].add(
                                 victim_node)
@@ -148,8 +150,9 @@ class ProfitChecker(Checker):
         self.check_candidate(attack_candidate)
 
     def check_candidate(self, candidate):
-        if candidate.type not in ('reentrancy', 'integer-overflow'):
+        if candidate.type not in ('integer-overflow'):
             self.out.dump_candidate(candidate)
+            return
         # extract the candidate attack profits
         candidate_profits = self.extract_candidate_profits(candidate)
 
