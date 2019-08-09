@@ -36,7 +36,7 @@ def main(db_folder, mysql_password, log_path, input_log_file=None):
     tca = TransactionCentricAnalysis()
     tca.register_transaction_centric_checker(CallInjectionChecker())
     tca.register_transaction_centric_checker(AirdropHuntingChecker())
-    tca.register_transaction_centric_checker(IntegerOverflowChecker(10**60))
+    tca.register_transaction_centric_checker(IntegerOverflowChecker(10**72))
     tca.register_transaction_centric_checker(ReentrancyChecker(1))
     tca.register_transaction_centric_checker(HoneypotChecker())
     tca.register_transaction_centric_checker(CallAfterDestructChecker())
