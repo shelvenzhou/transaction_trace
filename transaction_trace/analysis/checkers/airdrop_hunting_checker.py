@@ -46,7 +46,7 @@ class AirdropHuntingChecker(Checker):
                             })
 
             if len(results) > 0:
-                intentions.extend(results)
+                intentions.append(results)
 
         if len(intentions) > 0:
             tx.is_attack = True
