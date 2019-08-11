@@ -153,8 +153,10 @@ class HoneypotChecker(Checker):
 
             value = trace["value"]
             if value == 0:
-                if to_address in self.tracked_honeypots or from_address in self.tracked_honeypots:
+                if to_address in self.tracked_honeypots:
                     self.tracked_honeypots[to_address].income_tx()
+                elif from_address in self.tracked_honeypots:
+                    self.tracked_honeypots[from_address].income_tx()
                 continue
 
             if to_address in self.current_created or to_address in self.last_created:
