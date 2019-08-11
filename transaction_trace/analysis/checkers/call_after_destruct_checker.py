@@ -50,7 +50,11 @@ class CallAfterDestructChecker(Checker):
                     tx.attack_candidates.append(
                         AttackCandidate(
                             self.name,
-                            {"transaction": tx.tx_hash, "suicided_contract": to_address},
+                            {
+                                "transaction": tx.tx_hash,
+                                "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
+                                "suicided_contract": to_address
+                            },
                             {ResultType.ETHER_TRANSFER: trace["value"]}
                         )
                     )
