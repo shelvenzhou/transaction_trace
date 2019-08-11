@@ -1,7 +1,7 @@
 import pickle
 
 from ...basic_utils import DatetimeUtils
-from ..intermediate_representations import ResultGraph
+from ..intermediate_representations import ActionTree, ResultGraph
 from ..knowledge import SensitiveAPIs
 from ..results import AttackCandidate, ResultType
 from .checker import Checker, CheckerType
@@ -31,7 +31,8 @@ class IntegerOverflowChecker(Checker):
             trace = at.edges[e]
             if trace['trace_type'] != "call":
                 continue
-            if e[1] in self.contract_creator and tx.caller == self.contract_creator[e[1]]:
+            to_address = ActionTree.extract_address_from_node(e[1])
+            if to_address in self.contract_creator and tx.caller == self.contract_creator[to_address]:
                 continue
 
             if SensitiveAPIs.sensitive_function_call(trace['input']):
@@ -83,7 +84,7 @@ class IntegerOverflowChecker(Checker):
                         continue
                     real_token_transfers.add(
                         ResultGraph.extract_token_address(result_type))
-                    if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER_EVENT]:
+                    if rg.nodes[node][result_type] > self.threshold:
                         profit[result_type] = rg.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
