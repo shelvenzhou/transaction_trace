@@ -75,15 +75,12 @@ class AirdropHuntingChecker(Checker):
                 # intentions,
                 profits,
             )
-            if expected_token_transfers != real_token_transfers or len(action_tree.errs) > 0:
-                if expected_token_transfers != real_token_transfers:
-                    candidate.add_failed_reason("unrealized token transfer")
-                if len(action_tree.errs) > 0:
-                    errs = set()
-                    for err in action_tree.errs:
-                        if err["error"] not in errs:
-                            candidate.add_failed_reason(err["error"])
-                        errs.add(err["error"])
+            if len(action_tree.errs) > 0:
+                errs = set()
+                for err in action_tree.errs:
+                    if err["error"] not in errs:
+                        candidate.add_failed_reason(err["error"])
+                    errs.add(err["error"])
                 tx.failed_attacks.append(candidate)
             else:
                 tx.attack_candidates.append(candidate)
