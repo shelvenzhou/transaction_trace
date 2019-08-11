@@ -140,9 +140,10 @@ class HoneypotChecker(Checker):
             self.tracked_honeypots[created_contract] = Honeypot(
                 created_contract, details["creator"], tx.tx_hash, tx_time)
 
-        # we focus on direct calls
-        root = [n for n, d in at.in_degree() if d == 0][0]
-        for e in at.edges(root):
+        # # we focus on direct calls
+        # root = [n for n, d in at.in_degree() if d == 0][0]
+        # for e in at.edges(root):
+        for e in at.edges():
             from_address = ActionTree.extract_address_from_node(e[0])
             to_address = ActionTree.extract_address_from_node(e[1])
             trace = at.edges[e]
