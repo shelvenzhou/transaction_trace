@@ -172,7 +172,8 @@ class HoneypotChecker(Checker):
                 succ = self.tracked_honeypots[to_address].income(tx.tx_hash, from_address, value)
                 if not succ:
                     self._stop_track(to_address)
-            elif from_address in self.tracked_honeypots:
+
+            if from_address in self.tracked_honeypots:
                 succ = self.tracked_honeypots[from_address].withdraw(tx.tx_hash, to_address, value)
                 if not succ:
                     self._stop_track(from_address)
