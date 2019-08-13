@@ -48,6 +48,9 @@ class ReentrancyChecker(Checker):
             walk['edge'] = e
             walk['trace_id'] = call_traces[walk['trace_id']]['parent_trace_id']
 
+        if len(walked_edges) > 0:
+            turns_count += 0.5
+
         entry = "%s:%s" % (walk['trace_id'], walk['edge'][0])
         return entry, turns_count
 
@@ -83,7 +86,7 @@ class ReentrancyChecker(Checker):
             return
 
         for cycle in cycles:
-            if len(cycle) < 2:
+            if len(cycle) < 2 or tx.caller in cycle:
                 continue
             entry, iter_num = self.count_iter_num(g, cycle)
             if iter_num > self.threshold:
@@ -146,6 +149,7 @@ class ReentrancyChecker(Checker):
                 self.name,
                 {
                     "transaction": tx.tx_hash,
+                    "tx_caller": tx.caller,
                     "tx_time": DatetimeUtils.time_to_str(tx.block_timestamp),
                     "attacks": intentions,
                 },
