@@ -44,6 +44,14 @@ class AirdropHuntingChecker(Checker):
                                 "result_type": result_type,
                                 "amount": amount,
                             })
+                    elif ResultGraph.extract_result_type(result_type) == ResultType.ETHER_TRANSFER:
+                        amount = prg.nodes[node][result_type]
+                        if amount > 0:
+                            results.append({
+                                "profit_node": node,
+                                "result_type": result_type,
+                                "amount": amount,
+                            })
 
             if len(results) > 0:
                 intentions.append(results)
@@ -56,11 +64,13 @@ class AirdropHuntingChecker(Checker):
             for node in rg.nodes():
                 profit = dict()
                 for result_type in rg.nodes[node]:
-                    if ResultGraph.extract_result_type(result_type) != ResultType.TOKEN_TRANSFER_EVENT:
-                        continue
-                    real_token_transfers.add(ResultGraph.extract_token_address(result_type))
-                    if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER_EVENT]:
-                        profit[result_type] = rg.nodes[node][result_type]
+                    if ResultGraph.extract_result_type(result_type) == ResultType.TOKEN_TRANSFER_EVENT:
+                        real_token_transfers.add(ResultGraph.extract_token_address(result_type))
+                        if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.TOKEN_TRANSFER_EVENT]:
+                            profit[result_type] = rg.nodes[node][result_type]
+                    elif ResultGraph.extract_result_type(result_type) == ResultType.ETHER_TRANSFER:
+                        if rg.nodes[node][result_type] > self.minimum_profit_amount[ResultType.ETHER_TRANSFER]:
+                            profit[result_type] = rg.nodes[node][result_type]
                 if len(profit) > 0:
                     profits[node] = profit
 
@@ -82,6 +92,9 @@ class AirdropHuntingChecker(Checker):
                     if err["error"] not in errs:
                         candidate.add_failed_reason(err["error"])
                     errs.add(err["error"])
+                tx.failed_attacks.append(candidate)
+            elif len(profits) == 0:
+                candidate.add_failed_reason(err["causing no profits"])
                 tx.failed_attacks.append(candidate)
             else:
                 tx.attack_candidates.append(candidate)
