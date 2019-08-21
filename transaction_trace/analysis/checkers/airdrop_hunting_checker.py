@@ -94,7 +94,7 @@ class AirdropHuntingChecker(Checker):
                     errs.add(err["error"])
                 tx.failed_attacks.append(candidate)
             elif len(profits) == 0:
-                candidate.add_failed_reason(err["causing no profits"])
+                candidate.add_failed_reason("causing no profits")
                 tx.failed_attacks.append(candidate)
             else:
                 tx.attack_candidates.append(candidate)
