@@ -117,12 +117,12 @@ class TODChecker(Checker):
             return
 
         called_contract = trace["to_address"]
-        access = StorageAccess(tx.tx_hash, called_contract, None)
-        access.inputs.add(trace["input"])
-        access.cause_ether_flow = (trace["value"] > 0)
+        # access = StorageAccess(tx.tx_hash, called_contract, None)
+        # access.inputs.add(trace["input"])
+        # access.cause_ether_flow = (trace["value"] > 0)
         # for e in rg.edges:
         #     for result_type in rg.edges[e]:
         #         if result_type == ResultType.ETHER_TRANSFER and rg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
         #             ether_flow = True
 
-        self.contract_accesses[called_contract].append(access)
+        self.contract_accesses[called_contract].append(tx.tx_hash)
