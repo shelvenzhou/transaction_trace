@@ -67,7 +67,7 @@ class TODChecker(Checker):
 
     def __init__(self, passwd="password"):
         super(TODChecker, self).__init__("transaction-order-dependence-checker")
-        self.code_database = CachedCodeDatabase(passwd)
+        # self.code_database = CachedCodeDatabase(passwd)
 
         self.latest_block = None
         self.contract_accesses = defaultdict(list)
@@ -89,61 +89,18 @@ class TODChecker(Checker):
                 if len(accessed_txs) < 2:
                     continue
 
-                # skip txs which cause no ether flow
-                ether_related = False
-                for accessed_tx in accessed_txs:
-                    if accessed_tx.cause_ether_flow:
-                        ether_related = True
-                        break
-                if not ether_related:
-                    continue
-
-                # cross-tx read after write is regarded as TOD
-                stored_index = dict()
-                affected_txs = list()
-                ether_flow = False
-                for accessed_tx in accessed_txs:
-                    affected = False
-                    affected_by = list()
-                    affected_index = list()
-                    for op, index in accessed_tx.storage_accesses():
-                        if op == "load":
-                            if index in stored_index and stored_index[index] != accessed_tx.tx_hash:
-                                affected = True
-                                if index not in affected_index:
-                                    affected_index.append(index)
-                                    affected_by.append(stored_index[index])
-                        elif op == "store":
-                            stored_index[index] = accessed_tx.tx_hash
-
-                    if affected:
-                        if accessed_tx.cause_ether_flow:
-                            ether_flow = True
-
-                        affected_txs.append(
-                            {
-                                "affected_tx": accessed_tx.tx_hash,
-                                "affected_by": list(zip(affected_by, affected_index)),
-                            }
-                        )
-
-                if len(affected_txs) > 0:
-                    tx.is_attack = True
-                    candidate = AttackCandidate(
-                        self.name,
-                        {
-                            "contract": contract,
-                            "block_number": self.latest_block,
-                        },
-                        {
-                            "affected_txs": affected_txs,
-                        }
-                    )
-                    if ether_flow:
-                        tx.attack_candidates.append(candidate)
-                    else:
-                        candidate.add_failed_reason("cause no ether flow")
-                        tx.failed_attacks.append(candidate)
+                tx.is_attack = True
+                candidate = AttackCandidate(
+                    self.name,
+                    {
+                        "contract": contract,
+                        "block_number": self.latest_block,
+                    },
+                    {
+                        "accessed_txs": accessed_txs,
+                    }
+                )
+                tx.attack_candidates.append(candidate)
 
             self.latest_block = tx.block_number
             self.contract_accesses.clear()
@@ -160,12 +117,12 @@ class TODChecker(Checker):
             return
 
         called_contract = trace["to_address"]
-        access = StorageAccess(tx.tx_hash, called_contract, self.code_database.read_bytecode(called_contract))
+        access = StorageAccess(tx.tx_hash, called_contract, None)
         access.inputs.add(trace["input"])
         access.cause_ether_flow = (trace["value"] > 0)
-        for e in rg.edges:
-            for result_type in rg.edges[e]:
-                if result_type == ResultType.ETHER_TRANSFER and rg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
-                    ether_flow = True
+        # for e in rg.edges:
+        #     for result_type in rg.edges[e]:
+        #         if result_type == ResultType.ETHER_TRANSFER and rg.edges[e][result_type] > self.minimum_profit_amount[result_type]:
+        #             ether_flow = True
 
         self.contract_accesses[called_contract].append(access)
