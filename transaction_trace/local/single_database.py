@@ -149,7 +149,7 @@ class SingleTraceDatabase(Database):
             'block_hash':           STRING,     REQUIRED
         '''
         # columns = "rowid, *" if with_rowid else "*"
-        columns = "rowid, transaction_hash, transaction_index, from_address, to_address, value, input, trace_type, call_type, trace_address, error, status, block_timestamp, block_number, block_hash" if with_rowid else "*"
+        columns = "rowid, transaction_hash, transaction_index, from_address, to_address, value, input, trace_type, call_type, gas, gas_used, trace_address, error, status, block_timestamp, block_number, block_hash" if with_rowid else "*"
         return self.read("traces", columns)
 
     def insert_subtrace(self, row):

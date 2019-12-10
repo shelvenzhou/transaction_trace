@@ -41,6 +41,7 @@ def main(db_folder, mysql_password, log_path, input_log_file=None):
     tca.register_transaction_centric_checker(HoneypotChecker())
     tca.register_transaction_centric_checker(CallAfterDestructChecker())
     # tca.register_transaction_centric_checker(TODChecker(mysql_password))
+    tca.register_transaction_centric_checker(SimplifiedTODChecker())
 
     for call_tree, result_graph in p.preprocess():
         if call_tree is None:
