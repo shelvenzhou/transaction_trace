@@ -28,7 +28,7 @@ class StorageAccess:
     def similar_gas(self, other):
         if not isinstance(other, StorageAccess):
             return True
-        if self.gas == 0:
+        if self.gas == 0 or other.gas == 0:
             # import ipdb; ipdb.set_trace()
             return True
         return (abs(self.gas - other.gas) / self.gas) < 0.5
